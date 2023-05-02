@@ -1,0 +1,63 @@
+#!/bin/bash
+
+declare -r fmt_sn='%s\n'
+declare -r fmt_tsn='\t%s\n'
+declare -r fmt_nsn='\n%s\n'
+declare -r fmt_use='Usage: %s\n'
+declare -r TRUE=0
+declare -r FALSE=1
+
+_print_error() {
+   if [ -z "$1" ]; then
+      _invalid_argument ${FUNCNAME[0]}
+   elif [ -z "$2" ]; then
+      fmt="$fmt_sn"
+   else
+      fmt="$2"
+   fi
+   printf "$fmt" "$1" >&2
+}
+
+_usage() {
+   _print_error "$0 $USAGE_STR" "$fmt_use"
+   exit 100
+}
+
+_invalid_argument() {
+   if [ -z "$1" ]; then
+      _invalid_argument ${FUNCNAME[0]}
+   fi
+   _print_error "$1: Invalid Argument(s)"
+   exit 99 
+}
+
+_int_test() {
+   if [ -z "${1##*[!0-9]*}" ]; then
+      return 98
+   fi
+}
+
+_print_caps() {
+   if [ -z "$1" ]; then
+      _invalid_argument ${FUNCNAME[0]}
+   elif [ -z "$2" ]; then
+      fmt="$fmt_sn"
+   else
+      fmt="$2"
+   fi
+   printf "$fmt" "${1^^}"
+}
+
+_display_menu() {
+   if [ $# -lt 2 ]; then
+      _invalid_argument ${FUNCNAME[0]}
+   fi
+   local menuopts=("$@")
+   for i in ${!menuopts[@]}; do
+      if [ $i -eq 0 ]; then
+         printf $fmt_sn "${menuopts[$i]}"
+      else
+         printf $fmt_tsn "$i) ${menuopts[$i]}"
+      fi
+   done
+}
