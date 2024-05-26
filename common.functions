@@ -1,63 +1,148 @@
 #!/bin/bash
 
-declare -r fmt_sn='%s\n'
-declare -r fmt_tsn='\t%s\n'
-declare -r fmt_nsn='\n%s\n'
-declare -r fmt_use='Usage: %s\n'
-declare -r TRUE=0
-declare -r FALSE=1
+declare -r WAIT=60
+declare -r INVALID_ARGUMENTS='invalid arguments'
+declare -r NOT_INTEGER='is not an integer'
+declare -r NOT_RECOGNIZED_OPTION='is not a recognized option'
+declare -r ANY_KEY_CONTINUE='Press any key to continue'
 
+########################################
+# Evaluates the first directory name in the path of the script that is being
+# executed and outputs a string that can be prepended to other file paths.
+# Arguments:
+#   path
+# Outputs:
+#   If the first directory name is 'shared' then a blank is output to stdout. If
+#   the first directory name is 'acceptance' then '/acceptance' is output to
+#   stdout. If the first direcotry name is 'home' then the home directory of the
+#   account executing the script is output to stdout. In any other case an error
+#   message is output to stderr.
+########################################
+_get_windows_path() {
+  echo $(realpath "${1:?}" | sed -e 's/^\///' -e 's/\//\\/g' -e 's/^./\0:/')
+}
+
+
+########################################
+# Prints an error message to stderr.
+# Arguments:
+#   The message
+# Outputs:
+#   If the message is not passed as an argument then a missing argument error
+#   is output to stderr, otherwise provided message will be printed to stderr.
+########################################
 _print_error() {
-   if [ -z "$1" ]; then
-      _invalid_argument ${FUNCNAME[0]}
-   elif [ -z "$2" ]; then
-      fmt="$fmt_sn"
-   else
-      fmt="$2"
-   fi
-   printf "$fmt" "$1" >&2
+  local error_message fmt
+  error_message=${1:?}
+  fmt='ERROR: %s\n'
+  if [ ! -z "$2" ]; then
+    fmt="$2"
+  fi
+  printf "$fmt" "$1" >&2
 }
 
+########################################
+# Prints the scripts usage message and exits with code 100.
+# Globals:
+#   USAGE_STR
+#   DOC_PAGE
+# Arguments:
+#   None
+# Outputs:
+#   The useage message is output to stderr.
+########################################
 _usage() {
-   _print_error "$0 $USAGE_STR" "$fmt_use"
-   exit 100
+  script_name=$(basename $0)
+  _print_error "$script_name $USAGE_STR" 'Usage: %s\n'
+  if [ ! -z "$DOC_PAGE" ]; then
+    printf '%s\n' "Please reference: $DOC_PAGE"
+  fi
+  exit 100
 }
 
-_invalid_argument() {
-   if [ -z "$1" ]; then
-      _invalid_argument ${FUNCNAME[0]}
-   fi
-   _print_error "$1: Invalid Argument(s)"
-   exit 99 
+########################################
+# Prints the invalid arguments message and calls the _usage function.
+# Globals:
+#   INVALID_ARGUMENTS
+# Arguments:
+#   The script's command line arguments
+# Outputs:
+#   The invalid arguments message is output to stderr.
+########################################
+_invalid_arguments() {
+  _print_error "$0: $INVALID_ARGUMENTS -- $*" '%s\n'
+  _usage
 }
 
+########################################
+# Tests a value to determine if it is a valid integer.
+# Arguments:
+#   The value
+# Returns:
+#   If the value is not a valid integer then a 1 is returned, othewise a 0 is
+#   returned.
+########################################
 _int_test() {
-   if [ -z "${1##*[!0-9]*}" ]; then
-      return 98
-   fi
+  local arg
+  arg=${1:?}
+  if [ -z "${arg##*[!0-9]*}" ]; then
+    return 1
+  fi
 }
 
-_print_caps() {
-   if [ -z "$1" ]; then
-      _invalid_argument ${FUNCNAME[0]}
-   elif [ -z "$2" ]; then
-      fmt="$fmt_sn"
-   else
-      fmt="$2"
-   fi
-   printf "$fmt" "${1^^}"
+_get_random_string() {
+  local length=${1:?} include=${2:?}
+  if _int_test $length; then
+    echo $(cat /dev/urandom | tr -dc "$include" | fold -w $length | head -n 1)
+  else
+    _print_error "${FUNCNAME[0]}: $length $NOT_INTEGER" '%s\n'
+    return 1
+  fi
 }
 
+########################################
+# Prints a prompt and reads a 1 character user response.
+# Arguments:
+#   The prompt
+# Outputs:
+#   Prints the prompt with an added '[Y/N]' at the end.
+# Returns:
+#   If the user response is a 'Y' or 'y' then a 0 is returned, if it is a 'N'
+#   or 'n' then a 1 is returned, otherwise a 2 is returned.
+########################################
+_yes_no_prompt() {
+  local usrin
+  read -n 1 -p "$1 [Y/N] " usrin
+  case "$usrin" in
+    [Yy])
+      return 0
+      ;;
+    [Nn])
+      return 1
+      ;;
+    *)
+      return 2
+      ;;
+  esac
+}
+
+########################################
+# Prints an itemized menu based on the contents of an array. The first element
+# in the array is used to create the menu prompt. Every other element will be
+# used to create a numbered menu item.
+# Arguments:
+#   The array
+# Outputs:
+#   Prints a menu prompt, followed by a numbered list of menu items.
+########################################
 _display_menu() {
-   if [ $# -lt 2 ]; then
-      _invalid_argument ${FUNCNAME[0]}
-   fi
-   local menuopts=("$@")
-   for i in ${!menuopts[@]}; do
-      if [ $i -eq 0 ]; then
-         printf $fmt_sn "${menuopts[$i]}"
-      else
-         printf $fmt_tsn "$i) ${menuopts[$i]}"
-      fi
-   done
+  local menuopts
+  menuopts=("$@")
+  for i in ${!menuopts[@]}; do
+    if [ $i -eq 0 ]; then
+      printf '%s\n' "${menuopts[$i]}"
+    else
+      printf '  %s\t%s\n' "$i)" "${menuopts[$i]}"
+    fi
+  done
 }

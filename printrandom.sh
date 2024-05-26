@@ -1,6 +1,6 @@
 #!/bin/bash
 
-. ./common.functions
+. $LIB_LOC/common.functions
 
 USAGE_STR='[-l length] [-n #_special_chars] [-s special_chars]'
 LENGTH=15
