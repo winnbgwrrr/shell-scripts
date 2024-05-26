@@ -20,6 +20,3 @@ nnoremap ,i mqggVG=`qzz
 nnoremap ,b :e ++ff=unix<CR>
 nnoremap ,m :%s/\r$//<CR>
 nnoremap ,s :set ft=sh<CR>
-
-set nu
-set autoindent expandtab tabstop=3 shiftwidth=3

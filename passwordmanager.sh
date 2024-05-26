@@ -1,19 +1,8 @@
 #!/bin/bash
 
-. ./common.functions
+. $LIB_LOC/common.functions
 
-USAGE_STR='[user]'
-
-if [ $# -ne 1 ]; then
-   _usage "$USAGE_STR"
-fi
-
-toplevel='/c/users/winsl'
-user="$1"
-secdir='Documents/secure'
-outfile="$secdir/.passfile"
-encfile='secure.tar.gpg'
-special_chars='@#$%&_+='
+declare -r USAGE_STR='[-h] [user]'
 
 _start() {
    cd $toplevel
@@ -35,21 +24,28 @@ _stop() {
 }
 
 _menu() {
-   local menuopts=("$@")
-   _display_menu "$@"
+   local menuopts
+   menuopts=("$@")
+   _display_menu "${menuopts[@]}"
    local usrin lastopt=$((${#menuopts[@]}-1))
-   read -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
-   case $usrin in
-      [0-9]*) _${menuopts[$usrin],} ;;
-      [Qq]*) _quit ;;
-      *) clear
-         printf $fmt_sn "$usrin is not a recognized option."
+   read -t $WAIT -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
+   echo
+   case "$usrin" in
+      [0-9]*)
+         _${menuopts[$usrin],}
+         ;;
+      ""|[Qq]*)
+         _quit
+         ;;
+      *)
+         clear
+         printf '%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
          ;;
    esac
 }
 
 _main_menu() {
-   printf $fmt_sn 'MAIN MENU'
+   printf '%s\n' 'MAIN MENU'
    if [ -f "$outfile" ]; then
       _menu 'Select one of the following options' 'List' 'Add' 'Quit'
    else
@@ -60,7 +56,7 @@ _main_menu() {
 
 _list() {
    clear
-   printf $fmt_sn 'ACCOUNT LIST'
+   printf '%s\n' 'ACCOUNT LIST'
    declare -a listopts=('Please choose one of the following accounts (or press any other key to return to the main menu)')
    for line in $(cat $outfile); do
       listopts+=(${line%%:*})
@@ -68,17 +64,22 @@ _list() {
    listopts+=('Back to Main Menu')
    _display_menu "${listopts[@]}" 
    local usrin lastopt=$((${#listopts[@]}-1))
-   read -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
-   case $usrin in
-      $lastopt)
+   read -t $WAIT -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
+   echo
+   case "$usrin" in
+      ""|$lastopt)
          clear
          _main_menu
          ;;
-      [0-9]*) _select $usrin ;;
-      [Qq]*) _quit ;;
+      [0-9]*)
+         _select $usrin
+         ;;
+      [Qq]*)
+         _quit
+         ;;
       *)
          clear
-         printf $fmt_sn "$usrin is not a recognized option."
+         printf '%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
          ;;
    esac
    _list
@@ -140,8 +141,19 @@ _select() {
 _update() {
    length=$(echo "$accinfo" | cut -d : -f 2)
    numspec=$(echo "$accinfo" | cut -d : -f 3)
-   excspec="$(echo "$accinfo" | cut -d : -f 4)"
-   str=$(printrandom.sh -l $length -n $numspec -e "$excspec")
+   excspec=$(echo "$accinfo" | cut -d : -f 4)
+   local args
+   if [ -n "$length" ]; then
+      args=" -l $length"
+   fi
+   if [ -n "$numspec" ]; then
+      args="$args -n $numspec"
+   fi
+   if [ -n "$excspec" ]; then
+      spchars=$(echo "$special_chars" | tr -d "$excspec")
+      args="$args -s $spchars"
+   fi
+   str=$(printrandom.sh $args)
    rc=$?
    if [ $rc -eq 0 ]; then
       sed -i "s/^\($accname.*\/\).*/\1$str/" $outfile
@@ -150,7 +162,7 @@ _update() {
       _print_error 'An error ocurred while generating a new password.'
       return $rc
    fi
-   printf $fmt_sn "$accname updated."
+   printf '%s\n' "$accname updated."
    accinfo=$(sed "${linenum}q;d" $outfile)
    _show
 }
@@ -162,23 +174,49 @@ _delete() {
    case "$usrin" in
       [Yy]*)
          sed -i "${linenum}d" $outfile
-         printf $fmt_sn "$accname deleted."
-         read -n 1 -p 'Press any key to continue'
+         printf '%s\n' "$accname deleted."
+         read -n 1 -p "$ANY_KEY_CONTINUE"
    esac
 }
 
 _show() {
-   clear
    local creds=${accinfo##*:}
    usrname=$(echo "$creds" | cut -d / -f 1)
    str=$(echo "$creds" | cut -d / -f 2)
-   _print_caps "$accname"
-   printf $fmt_tsn "$usrname" 
-   printf $fmt_tsn "$str" 
-   read -n 1 -p 'Press any key to continue'
+   i=0
+   while [ $i -lt $WAIT ]; do
+      clear 
+      echo "$str" > /dev/clipboard
+      ((i=i+1))
+      printf '%s - %s (%s)' "${accname^^}" "$usrname" "$i"
+      sleep 1
+   done
+   echo > /dev/clipboard
 }
 
+while getopts 'h' OPT; do
+   case "$OPT" in
+      h|*) _usage ;;
+   esac
+done
+
+shift $((OPTIND-1))
+
+if [ $# -ne 1 ]; then
+   _invalid_arguments "$@"
+fi
+
+user="$1"
+toplevel='/c/users/winsl'
+secdir='Documents/secure'
+outfile="$secdir/.passfile"
+encfile='secure.tar.gpg'
+special_chars='@#$%&_+='
+
 trap _stop EXIT
+
 _start
+
 clear
+
 _main_menu

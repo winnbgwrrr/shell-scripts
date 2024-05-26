@@ -1,12 +1,15 @@
 #!/bin/bash
 
-. ./common.functions
+. $LIB_LOC/common.functions
 
-USAGE_STR='[-d file] [-e user:directory]'
+declare -r USAGE_STR='[-d file] [-e user:directory]'
 
 _encrypt() {
-   if [ ! -d "$1" ] || [ -z "$2" ]; then
-      _invalid_argument ${FUNCNAME[0]}
+   local directory user
+   directory=${1:?}
+   user=${2:?}
+   if [ ! -d "$1" ]; then
+      _print_error "No such directory $directory"
    fi
    tarfile=$(basename $1).tar
    if tar -cvf $tarfile $1; then
@@ -22,15 +25,15 @@ _encrypt() {
 }
 
 _decrypt() {
-   if [ "${1##*.}" = "gpg" ]; then
-      tarfile=${1%.*}
-   elif [ "${1##*.}" != "tar" ]; then
-      tarfile=$1.tar
-   else
-      tarfile=$1
+   local tarfile
+   tarfile=${1:?}
+   if [ "${tarfile##*.}" = "gpg" ]; then
+      tarfile=${tarfile%.*}
+   elif [ "${tarfile##*.}" != "tar" ]; then
+      tarfile=$tarfile.tar
    fi
    if [ ! -f "$tarfile.gpg" ]; then
-      _invalid_argument ${FUNCNAME[0]}
+      _print_error "No such file $tarfile.gpg"   
    fi
    if gpg -d -o secure.tar --pinentry-mode loopback $tarfile.gpg; then
       rm $tarfile.gpg
@@ -44,36 +47,48 @@ _decrypt() {
    fi
 }
 
-while getopts 'd:e:' OPT; do
+_not_both() {
+   _print_error 'The encrypt and decrypt options are mutually exclusive'
+   exit 99
+}
+
+decrypt=0
+encrypt=0
+while getopts 'd:e:h' OPT; do
    case "$OPT" in
       d)
-         decrypt=$TRUE
+         if [ $encrypt -eq 1 ]; then
+            _not_both
+         fi
+         decrypt=1
          target=$OPTARG
          ;;
       e) 
+         if [ $decrypt -eq 1 ]; then
+            _not_both
+         fi
          if echo "$OPTARG" | grep -q ':'; then
-            encrypt=$TRUE
+            encrypt=1
             target=${OPTARG#*:}
             user=${OPTARG%:*}
          fi
          ;;
-      *) _usage "$USAGE_STR" ;;
+      h|*)
+         _usage "$USAGE_STR"
+         ;;
    esac
-   if [ $encrypt ] && [ $decrypt ]; then
-       _usage "$USAGE_STR"
-   fi
 done
 
 shift $((OPTIND-1))
 
 if [ $# -ne 0 ]; then
-   _usage "$USAGE_STR"
-elif [ $encrypt ]; then
+   _invalid_arguments "$@"
+elif [ $encrypt -eq 1 ]; then
    _encrypt $target $user
-elif [ $decrypt ]; then
+elif [ $decrypt -eq 1 ]; then
    _decrypt $target
 else
-   _usage "$USAGE_STR"
+   _invalid_arguments "$@"
 fi
 
 exit 0
