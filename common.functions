@@ -1,41 +1,28 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-declare -r WAIT=60
+declare -r NO_FILE_NO_DIRECTORY='No such file or directory'
 declare -r INVALID_ARGUMENTS='invalid arguments'
 declare -r NOT_INTEGER='is not an integer'
 declare -r NOT_RECOGNIZED_OPTION='is not a recognized option'
 declare -r ANY_KEY_CONTINUE='Press any key to continue'
+declare -r NOT_GIT_REPO='is not a Git repository'
+declare -r NOT_GIT_BRANCH='is not a branch in this Git repository'
 
 ########################################
-# Evaluates the first directory name in the path of the script that is being
-# executed and outputs a string that can be prepended to other file paths.
-# Arguments:
-#   path
-# Outputs:
-#   If the first directory name is 'shared' then a blank is output to stdout. If
-#   the first directory name is 'acceptance' then '/acceptance' is output to
-#   stdout. If the first direcotry name is 'home' then the home directory of the
-#   account executing the script is output to stdout. In any other case an error
-#   message is output to stderr.
-########################################
-_get_windows_path() {
-  echo $(realpath "${1:?}" | sed -e 's/^\///' -e 's/\//\\/g' -e 's/^./\0:/')
-}
-
-
-########################################
-# Prints an error message to stderr.
+# Prints an error message to stderr with either the default format or one can
+# be passed to the function.
 # Arguments:
 #   The message
+#   The format (optional)
 # Outputs:
-#   If the message is not passed as an argument then a missing argument error
-#   is output to stderr, otherwise provided message will be printed to stderr.
+#   The message to stderr.
 ########################################
 _print_error() {
   local error_message fmt
   error_message=${1:?}
-  fmt='ERROR: %s\n'
-  if [ ! -z "$2" ]; then
+  if [ -z "$2" ]; then
+    fmt='ERROR: %s\n'
+  else
     fmt="$2"
   fi
   printf "$fmt" "$1" >&2
@@ -45,7 +32,6 @@ _print_error() {
 # Prints the scripts usage message and exits with code 100.
 # Globals:
 #   USAGE_STR
-#   DOC_PAGE
 # Arguments:
 #   None
 # Outputs:
@@ -54,6 +40,7 @@ _print_error() {
 _usage() {
   script_name=$(basename $0)
   _print_error "$script_name $USAGE_STR" 'Usage: %s\n'
+  _print_error "Try '$script_name -h' for more information." '%s\n'
   if [ ! -z "$DOC_PAGE" ]; then
     printf '%s\n' "Please reference: $DOC_PAGE"
   fi
@@ -62,8 +49,6 @@ _usage() {
 
 ########################################
 # Prints the invalid arguments message and calls the _usage function.
-# Globals:
-#   INVALID_ARGUMENTS
 # Arguments:
 #   The script's command line arguments
 # Outputs:
@@ -90,8 +75,34 @@ _int_test() {
   fi
 }
 
+########################################
+# Tests the argument passed to make sure that it is an integer value, and then
+# prints that number of spaces.
+# Arguments:
+#   The number of spaces
+# Outputs:
+#   Zero or more spaces.
+########################################
+_print_spaces() {
+  _int_test "$1"
+  printf '%*s' "$1" ''
+}
+
+########################################
+# Echos a string or randomized characters.
+# Globals:
+#   FUNCNAME
+# Arguments:
+#   The length of the string
+#   The characters that should be included in the string
+# Returns:
+#   A string od random characters, or a 1 if the value passed for length was not
+#   an integer.
+########################################
 _get_random_string() {
-  local length=${1:?} include=${2:?}
+  local length include
+  length=${1:?}
+  include=${2:?}
   if _int_test $length; then
     echo $(cat /dev/urandom | tr -dc "$include" | fold -w $length | head -n 1)
   else
@@ -145,4 +156,78 @@ _display_menu() {
       printf '  %s\t%s\n' "$i)" "${menuopts[$i]}"
     fi
   done
+}
+
+########################################
+# Outputs the name of the current Git repository's branch, or if the repository
+# is in a detached HEAD state it will return the most recent commit hash.
+# Arguments:
+#   none
+# Ouputs:
+#   The name of the branch or if the repository is in a detached HEAD state the
+#   most recent commit hash.
+# Returns:
+#   1 if the current directory is not a part of a Git repository.
+########################################
+_git_branch() {
+  git symbolic-ref --short -q HEAD || git rev-parse HEAD || return 1
+}
+
+########################################
+# Provides a menu to select a remote or local branch for the current Git
+# repository, and then does a git checkout of that branch.
+# Arguments:
+#   none
+# Ouputs:
+#   A message to stderr if the current directory is not a part of a Git
+#   repository.
+#   A message to stderr if the user intputs a selection that does not correspond
+#   to the menu being display.
+#   The menu listing branches to select from to stdout.
+# Returns:
+#   0 if the user selects to quit at the menu.
+#   1 if the current directory is not a part of a Git repository.
+########################################
+_git_branch_selector() {
+  if [ "$1" != '--no-pull' ] && ! _git_pull; then
+    _print_error "$PWD $NOT_GIT_REPO" '%s\n'
+    return 1
+  fi
+
+  if [ "$1" != '--no-pull' ]; then
+    git remote prune origin
+    git for-each-ref --format '%(refname:short)' refs/heads | \
+      grep -v 'main' | xargs git branch -d 2>/dev/null
+  fi
+
+  declare -a optslist=('Please select a branch to checkout.')
+  while read line; do
+    if [ -z "${line##*\**}" ] || [ -z "${line##*->*}" ]; then
+      continue
+    fi
+    optslist+=("$line")
+  done< <(git branch -a)
+  optslist+=('Quit')
+  _display_menu "${optslist[@]}"
+  local usrin lastopt
+  lastopt=$((${#optslist[@]}-1))
+  read -p "Enter Choice [1-$lastopt] " usrin
+  echo
+  case "$usrin" in
+    $lastopt|[Qq]*)
+      return 0
+      ;;
+    [0-9]*)
+      if [ -z "${optslist[$usrin]}" ]; then
+        _print_error "$usrin $NOT_RECOGNIZED_OPTION" '\n%s\n'
+        _git_branch_selector '--no-pull'
+      else
+        git checkout "${optslist[$usrin]}"
+      fi
+      ;;
+    *)
+      _print_error "$usrin $NOT_RECOGNIZED_OPTION" '\n%s\n'
+      _git_branch_selector '--no-pull'
+      ;;
+  esac
 }
