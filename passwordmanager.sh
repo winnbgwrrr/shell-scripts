@@ -28,7 +28,7 @@ _menu() {
    menuopts=("$@")
    _display_menu "${menuopts[@]}"
    local usrin lastopt=$((${#menuopts[@]}-1))
-   read -t $WAIT -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
+   read -t $wait_time -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
    echo
    case "$usrin" in
       [0-9]*)
@@ -62,9 +62,9 @@ _list() {
       listopts+=(${line%%:*})
    done
    listopts+=('Back to Main Menu')
-   _display_menu "${listopts[@]}" 
+   _display_menu "${listopts[@]}"
    local usrin lastopt=$((${#listopts[@]}-1))
-   read -t $WAIT -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
+   read -t $wait_time -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
    echo
    case "$usrin" in
       ""|$lastopt)
@@ -184,8 +184,8 @@ _show() {
    usrname=$(echo "$creds" | cut -d / -f 1)
    str=$(echo "$creds" | cut -d / -f 2)
    i=0
-   while [ $i -lt $WAIT ]; do
-      clear 
+   while [ $i -lt $wait_time ]; do
+      clear
       echo "$str" > /dev/clipboard
       ((i=i+1))
       printf '%s - %s (%s)' "${accname^^}" "$usrname" "$i"
@@ -212,6 +212,7 @@ secdir='Documents/secure'
 outfile="$secdir/.passfile"
 encfile='secure.tar.gpg'
 special_chars='@#$%&_+='
+wait_time=30
 
 trap _stop EXIT
 
