@@ -1,17 +1,10 @@
 #!/usr/bin/env bash
 
-declare -r TCEPROD='cfsaceis01'
-declare -r TCERSCH='cfsaceis02'
-declare -r TCEDVLP='cfsaceis03'
-declare -r TCETEST='cfsaceis04'
 declare -r NO_FILE_NO_DIRECTORY='No such file or directory'
 declare -r INVALID_ARGUMENTS='invalid arguments'
 declare -r NOT_INTEGER='is not an integer'
 declare -r NOT_RECOGNIZED_OPTION='is not a recognized option'
 declare -r ANY_KEY_CONTINUE='Press any key to continue'
-declare -r CONFLUENCE='https://cfsaceis04.psb.bls.gov:8093/confluence/display'
-declare -r UNEXPECTED_SURVEY_CODE='is not an expected survey code'
-declare -r UNEXPECTED_TOP_LEVEL='is not an expected top level directory'
 declare -r NOT_GIT_REPO='is not a Git repository'
 declare -r NOT_GIT_BRANCH='is not a branch in this Git repository'
 
@@ -22,7 +15,7 @@ declare -r NOT_GIT_BRANCH='is not a branch in this Git repository'
 #   The message
 #   The format (optional)
 # Outputs:
-#   The message to stderr.
+#   The message to stderr
 ########################################
 _print_error() {
   local error_message fmt
@@ -47,7 +40,7 @@ _print_error() {
 # Arguments:
 #   None
 # Outputs:
-#   The useage message is output to stderr.
+#   The useage message is output to stderr
 ########################################
 _usage() {
   script_name=$(basename $0)
@@ -64,7 +57,7 @@ _usage() {
 # Arguments:
 #   The script's command line arguments
 # Outputs:
-#   The invalid arguments message is output to stderr.
+#   The invalid arguments message is output to stderr
 ########################################
 _invalid_arguments() {
   _print_error '%s\n' "$0: $INVALID_ARGUMENTS -- $*"
@@ -127,8 +120,7 @@ _truncate() {
 # Arguments:
 #   The value
 # Returns:
-#   If the value is not a valid integer then a 1 is returned, othewise a 0 is
-#   returned.
+#   1 if the value is not a valid integer
 ########################################
 _int_test() {
   if [ -z "${1##*[!0-9]*}" ]; then
@@ -142,7 +134,7 @@ _int_test() {
 # Arguments:
 #   The number of spaces
 # Outputs:
-#   Zero or more spaces.
+#   Zero or more spaces
 ########################################
 _print_spaces() {
   _int_test "$1"
@@ -156,9 +148,10 @@ _print_spaces() {
 # Arguments:
 #   The length of the string
 #   The characters that should be included in the string
+# Outputs:
+#   A string of random characters
 # Returns:
-#   A string od random characters, or a 1 if the value passed for length was not
-#   an integer.
+#   1 if the value passed for length was not an integer
 ########################################
 _get_random_string() {
   local length include
@@ -177,10 +170,11 @@ _get_random_string() {
 # Arguments:
 #   The prompt
 # Outputs:
-#   Prints the prompt with an added '[Y/n]' at the end.
+#   Prints the prompt with an added '[Y/n]' at the end
 # Returns:
-#   If the user response is a 'Y' or 'y' then a 0 is returned, if it is a 'N'
-#   or 'n' then a 1 is returned, otherwise a 2 is returned.
+#   0 if the user inputs a 'Y' or 'y'
+#   1 if the user inputs a 'N' or 'n'
+#   2 if the user inputs anything else
 ########################################
 _yes_no_prompt() {
   local usrin
@@ -209,7 +203,7 @@ _yes_no_prompt() {
 #   The truncation length
 #   The array
 # Outputs:
-#   Prints a menu prompt, followed by a numbered list of menu items.
+#   Prints a menu prompt, followed by a numbered list of menu items
 #   A message to stderr if the argument following the --truncate option is not
 #   a valid integer
 #   A message to stderr if no arguments were provided to create a menu from
@@ -249,132 +243,18 @@ _display_menu() {
 }
 
 ########################################
-# Fetches the user's details and outputs the user's first and last name.
-# Globals:
-#   USER
-# Arguments:
-#   None
-# Outputs:
-#   The user's first and last name
-# Returns:
-#   1 if unable to retrieve the user's first and last name
-########################################
-_get_full_name() {
-  getent passwd $USER | cut -d ':' -f 5 | awk '{print $(NF-1), $NF}' || return 1
-}
-
-########################################
-# Uses the user's first and last name to construct the user's BLS LAN ID.
-# Arguments:
-#   None
-# Outputs:
-#   The user's LAN ID
-# Returns:
-#   1 if the call to _get_full_name returns a non-zero code
-########################################
-_get_lan_id() {
-  local first_name last_name
-  read -r first_name last_name <<<$(_get_full_name) || return 1
-  getent passwd | grep -i ":VAS:.*$first_name $last_name" | cut -d ':' -f 1
-}
-
-########################################
-# Uses the user's first and last name to construct the user's BLS email
-# address.
-# Arguments:
-#   None
-# Outputs:
-#   The user's email address
-# Returns:
-#   1 if the call to _get_full_name returns a non-zero code
-########################################
-_get_email() {
-  local first_name last_name
-  read -r first_name last_name <<<$(_get_full_name) || return 1
-  echo "$last_name.$first_name@bls.gov"
-}
-
-########################################
-# Takes the first letter of the survey name and returns the full name of the
-# survey. If a capital letter is passed the survey name that is returned will
-# begin with a capital letter, and if a lower case letter is passed the survey
-# name will be returned as entirely lower case.
-# Globals:
-#   FUNCNAME
-# Arguments:
-#   The value
-# Returns:
-#   The full survey name, or a 1 if the passed value is not recognized.
-########################################
-_get_survey() {
-  case "${1:?}" in
-    i)
-      echo 'interview'
-      ;;
-    I)
-      echo 'Interview'
-      ;;
-    d)
-      echo 'diary'
-      ;;
-    D)
-      echo 'Diary'
-      ;;
-    *)
-      _print_error '%s\n' "${FUNCNAME[0]}: $1 $UNEXPECTED_SURVEY_CODE"
-      return 1
-      ;;
-  esac
-}
-
-########################################
-# Evaluates the first directory name in the path of the script that is being
-# executed and outputs a string that can be prepended to other file paths.
-# Globals:
-#   FUNCNAME
-#   HOME
-# Arguments:
-#   None
-# Outputs:
-#   If the first directory name is 'shared' then a blank is output to stdout. If
-#   the first directory name is 'acceptance' then '/acceptance' is output to
-#   stdout. If the first direcotry name is 'home' then the home directory of the
-#   account executing the script is output to stdout. In any other case an error
-#   message is output to stderr.
-########################################
-_get_top_level_directory() {
-  local tl
-  tl=$(realpath $0 | cut -d '/' -f 2)
-  case "$tl" in
-    shared)
-      echo
-      ;;
-    acceptance)
-      echo "/$tl"
-      ;;
-    home)
-      echo "$HOME"
-      ;;
-    *)
-      _print_error '%s\n' "${FUNCNAME[0]}: $1 $UNEXPECTED_TOP_LEVEL"
-      return 1
-      ;;
-  esac
-}
-
-########################################
 # Performs a git checkout of the dvlp branch (or the main branch if there is no
 # dvlp branch) and then does a git pull.
 # Arguments:
 #   none
-# Ouputs:
+# Outputs:
 #   A message to stderr if the current directory is not a part of a Git
-#   repository.
+#   repository
 #   A message to stderr if the neither a dvlp or main branch is found for the
-#   repository.
+#   repository
 # Returns:
-#   1 if the current directory is not a part of a Git repository.
-#   2 is there it not possible to checkout a dvlp or a main branch.
+#   1 if the current directory is not a part of a Git repository
+#   2 is there it not possible to checkout a dvlp or a main branch
 ########################################
 _git_pull() {
   branch=$(git rev-parse --symbolic --verify dvlp 2>/dev/null) ||
@@ -397,13 +277,13 @@ _git_pull() {
 # provided by git.
 # Arguments:
 #   none
-# Ouputs:
+# Outputs:
 #   A message to stderr if the current directory is not a part of a Git
-#   repository.
-#   A message to stderr if the current branch is a static branch.
+#   repository
+#   A message to stderr if the current branch is a static branch
 # Returns:
-#   1 if the current directory is not a part of a Git repository.
-#   2 if the current branch is a static branch.
+#   1 if the current directory is not a part of a Git repositor
+#   2 if the current branch is a static branch
 ########################################
 _git_push() {
   git rev-parse 2>/dev/null ||
@@ -430,11 +310,11 @@ _git_push() {
 # is in a detached HEAD state it will return the most recent commit hash.
 # Arguments:
 #   none
-# Ouputs:
+# Outputs:
 #   The name of the branch or if the repository is in a detached HEAD state the
-#   most recent commit hash.
+#   most recent commit hash
 # Returns:
-#   1 if the current directory is not a part of a Git repository.
+#   1 if the current directory is not a part of a Git repository
 ########################################
 _git_branch() {
   git symbolic-ref --short -q HEAD || git rev-parse HEAD || return 1
@@ -448,8 +328,8 @@ _git_branch() {
 # Arguments:
 #   1 - forked branch
 #   2 - original branch
-# Ouputs:
-#   The last common ancestor commit from the time that the branch was created.
+# Outputs:
+#   The last common ancestor commit from the time that the branch was created
 ########################################
 _git_common_ancestor() {
   diff -u <(git rev-list --first-parent ${1:?}) \
@@ -464,20 +344,20 @@ _git_common_ancestor() {
 # branch and the main branch for repositories that do not.
 # Arguments:
 #   the name of a local branch (optional)
-# Ouputs:
+# Outputs:
 #   A message to stderr if the current directory is not a part of a Git
-#   repository.
+#     repository
 #   A message to stderr if the name of branch passed as an argument is not found
-#   in the Git repository.
+#   in the Git repository
 #   A message to stderr if there were no committed changes found to list in the
-#   development note.
-#   The development note to stdout.
+#   development note
+#   The development note to stdout
 # Returns:
-#   1 if the current directory is not a part of a Git repository.
+#   1 if the current directory is not a part of a Git repository
 #   2 if the name of branch passed as an argument is not found in the Git
-#   repository.
+#   repository
 #   3 if there are no differences found between the baseline branch and the
-#   target branch.
+#   target branch
 ########################################
 _gen_dev_note() {
   top_level=$(git rev-parse --show-toplevel 2>/dev/null) ||
@@ -523,15 +403,15 @@ _gen_dev_note() {
 # repository, and then does a git checkout of that branch.
 # Arguments:
 #   none
-# Ouputs:
+# Outputs:
 #   A message to stderr if the current directory is not a part of a Git
-#   repository.
+#   repository
 #   A message to stderr if the user intputs a selection that does not correspond
-#   to the menu being display.
-#   The menu listing branches to select from to stdout.
+#   to the menu being display
+#   The menu listing branches to select from to stdout
 # Returns:
-#   0 if the user selects to quit at the menu.
-#   1 if the current directory is not a part of a Git repository.
+#   0 if the user selects to quit at the menu
+#   1 if the current directory is not a part of a Git repository
 ########################################
 _git_branch_selector() {
   if [ "$1" != '--no-pull' ] && ! _git_pull; then
