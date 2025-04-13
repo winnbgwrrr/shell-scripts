@@ -19,15 +19,12 @@ declare -r NOT_GIT_BRANCH='is not a branch in this Git repository'
 ########################################
 _print_error() {
   local error_message fmt
-  if [ $# -eq 1 ]; then
-    error_message="$1"
-    fmt='ERROR: %s\n'
-  elif [ $# -eq 2 ]; then
-    error_message="$2"
+  fmt='ERROR: %s\n'
+  if [ $# -eq 2 ]; then
     fmt="$1"
-  else
-    _invalid_arguments "$@"
+    shift
   fi
+  error_message="${1:?}"
   tput setaf '1'
   printf "$fmt" "$error_message" >&2
   tput setaf '7'
