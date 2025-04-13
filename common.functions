@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 
+declare -r TCEPROD='cfsaceis01'
+declare -r TCERSCH='cfsaceis02'
+declare -r TCEDVLP='cfsaceis03'
+declare -r TCETEST='cfsaceis04'
 declare -r NO_FILE_NO_DIRECTORY='No such file or directory'
 declare -r INVALID_ARGUMENTS='invalid arguments'
 declare -r NOT_INTEGER='is not an integer'
 declare -r NOT_RECOGNIZED_OPTION='is not a recognized option'
 declare -r ANY_KEY_CONTINUE='Press any key to continue'
+declare -r CONFLUENCE='https://cfsaceis04.psb.bls.gov:8093/confluence/display'
+declare -r UNEXPECTED_SURVEY_CODE='is not an expected survey code'
+declare -r UNEXPECTED_TOP_LEVEL='is not an expected top level directory'
 declare -r NOT_GIT_REPO='is not a Git repository'
 declare -r NOT_GIT_BRANCH='is not a branch in this Git repository'
 
@@ -19,13 +26,18 @@ declare -r NOT_GIT_BRANCH='is not a branch in this Git repository'
 ########################################
 _print_error() {
   local error_message fmt
-  error_message=${1:?}
-  if [ -z "$2" ]; then
+  if [ $# -eq 1 ]; then
+    error_message="$1"
     fmt='ERROR: %s\n'
+  elif [ $# -eq 2 ]; then
+    error_message="$2"
+    fmt="$1"
   else
-    fmt="$2"
+    _invalid_arguments "$@"
   fi
-  printf "$fmt" "$1" >&2
+  tput setaf '1'
+  printf "$fmt" "$error_message" >&2
+  tput setaf '7'
 }
 
 ########################################
@@ -39,10 +51,10 @@ _print_error() {
 ########################################
 _usage() {
   script_name=$(basename $0)
-  _print_error "$script_name $USAGE_STR" 'Usage: %s\n'
-  _print_error "Try '$script_name -h' for more information." '%s\n'
+  _print_error 'Usage: %s\n' "$script_name $USAGE_STR"
+  _print_error '%s\n' "Try '$script_name -h' for more information."
   if [ ! -z "$DOC_PAGE" ]; then
-    printf '%s\n' "Please reference: $DOC_PAGE"
+    _print_error '%s\n' "Or reference: $DOC_PAGE"
   fi
   exit 100
 }
@@ -55,8 +67,59 @@ _usage() {
 #   The invalid arguments message is output to stderr.
 ########################################
 _invalid_arguments() {
-  _print_error "$0: $INVALID_ARGUMENTS -- $*" '%s\n'
+  _print_error '%s\n' "$0: $INVALID_ARGUMENTS -- $*"
   _usage
+}
+
+########################################
+# Either clears the screen or prints a blank line if the --debug option was
+# passed as an argument.
+# Arguments:
+#   The --debug option
+# Outputs:
+#   A message to stderr if any option other then --debug is provided as an
+#   argument
+# Returns:
+#   1 if any option other than --debug is provided as an argument
+########################################
+_clear() {
+  if [ -z "$1" ]; then
+    clear
+    return 0
+  elif [ "$1" = '--debug' ]; then
+    echo
+    return 0
+  fi
+
+  _print_error '%s\n' "${FUNCNAME[0]}: $INVALID_ARGUMENTS -- $*"
+  return 1
+}
+
+########################################
+# Prints a truncated version of the string provided as an arugment followed by
+# an ellipsis. If the original string length is equal to or less than the
+# specified length that the original string will be printed with no ellipsis.
+# Arguments:
+#   The length
+# Outputs:
+#   A message to stderr if the length argument is not a valid integer
+# Returns:
+#   1 if the length argument is not a valid integer
+########################################
+_truncate() {
+  length=${1:?}
+  shift
+  _int_test $length ||
+    {
+      _print_error '%s\n' "$length is not a valid integer"
+      return 1
+    }
+  string="${@:?}"
+  if [ ${#string} -gt $length ]; then
+    echo "${string:0:$length}..."
+  else
+    echo "$string"
+  fi
 }
 
 ########################################
@@ -68,9 +131,7 @@ _invalid_arguments() {
 #   returned.
 ########################################
 _int_test() {
-  local arg
-  arg=${1:?}
-  if [ -z "${arg##*[!0-9]*}" ]; then
+  if [ -z "${1##*[!0-9]*}" ]; then
     return 1
   fi
 }
@@ -106,7 +167,7 @@ _get_random_string() {
   if _int_test $length; then
     echo $(cat /dev/urandom | tr -dc "$include" | fold -w $length | head -n 1)
   else
-    _print_error "${FUNCNAME[0]}: $length $NOT_INTEGER" '%s\n'
+    _print_error '%s\n' "${FUNCNAME[0]}: $length $NOT_INTEGER"
     return 1
   fi
 }
@@ -116,14 +177,15 @@ _get_random_string() {
 # Arguments:
 #   The prompt
 # Outputs:
-#   Prints the prompt with an added '[Y/N]' at the end.
+#   Prints the prompt with an added '[Y/n]' at the end.
 # Returns:
 #   If the user response is a 'Y' or 'y' then a 0 is returned, if it is a 'N'
 #   or 'n' then a 1 is returned, otherwise a 2 is returned.
 ########################################
 _yes_no_prompt() {
   local usrin
-  read -n 1 -p "$1 [Y/N] " usrin
+  read -n 1 -p "$1 [Y/n] " usrin
+  echo
   case "$usrin" in
     [Yy])
       return 0
@@ -140,22 +202,227 @@ _yes_no_prompt() {
 ########################################
 # Prints an itemized menu based on the contents of an array. The first element
 # in the array is used to create the menu prompt. Every other element will be
-# used to create a numbered menu item.
+# used to create a numbered menu item. Menu items will be truncated if the
+# --truncate option is provided.
 # Arguments:
+#   The --truncate option
+#   The truncation length
 #   The array
 # Outputs:
 #   Prints a menu prompt, followed by a numbered list of menu items.
+#   A message to stderr if the argument following the --truncate option is not
+#   a valid integer
+#   A message to stderr if no arguments were provided to create a menu from
+# Returns:
+#   1 if the argument following the --truncate option is not a valid integer
+#   2 if no arguments were provided to create a menu from
 ########################################
 _display_menu() {
-  local menuopts
+  local menuopts length
+  if [ "$1" = '--truncate' ]; then
+    shift
+    length=${1:?}
+    if _int_test $length; then
+      shift
+    else
+      _print_error '%s\n' "$length is not a valid integer"
+      return 1
+    fi
+  fi
+  if [ -z "$1" ]; then
+    _print_error '%s\n' 'No menu options found'
+    return 2
+  fi
   menuopts=("$@")
   for i in ${!menuopts[@]}; do
     if [ $i -eq 0 ]; then
       printf '%s\n' "${menuopts[$i]}"
     else
-      printf '  %s\t%s\n' "$i)" "${menuopts[$i]}"
+      if [ -n "$length" ]; then
+        menuopt="$(_truncate $length ${menuopts[$i]})"
+      else
+        menuopt="${menuopts[$i]}"
+      fi
+      printf '  %s\t%s\n' "$i)" "$menuopt"
     fi
   done
+}
+
+########################################
+# Fetches the user's details and outputs the user's first and last name.
+# Globals:
+#   USER
+# Arguments:
+#   None
+# Outputs:
+#   The user's first and last name
+# Returns:
+#   1 if unable to retrieve the user's first and last name
+########################################
+_get_full_name() {
+  getent passwd $USER | cut -d ':' -f 5 | awk '{print $(NF-1), $NF}' || return 1
+}
+
+########################################
+# Uses the user's first and last name to construct the user's BLS LAN ID.
+# Arguments:
+#   None
+# Outputs:
+#   The user's LAN ID
+# Returns:
+#   1 if the call to _get_full_name returns a non-zero code
+########################################
+_get_lan_id() {
+  local first_name last_name
+  read -r first_name last_name <<<$(_get_full_name) || return 1
+  getent passwd | grep -i ":VAS:.*$first_name $last_name" | cut -d ':' -f 1
+}
+
+########################################
+# Uses the user's first and last name to construct the user's BLS email
+# address.
+# Arguments:
+#   None
+# Outputs:
+#   The user's email address
+# Returns:
+#   1 if the call to _get_full_name returns a non-zero code
+########################################
+_get_email() {
+  local first_name last_name
+  read -r first_name last_name <<<$(_get_full_name) || return 1
+  echo "$last_name.$first_name@bls.gov"
+}
+
+########################################
+# Takes the first letter of the survey name and returns the full name of the
+# survey. If a capital letter is passed the survey name that is returned will
+# begin with a capital letter, and if a lower case letter is passed the survey
+# name will be returned as entirely lower case.
+# Globals:
+#   FUNCNAME
+# Arguments:
+#   The value
+# Returns:
+#   The full survey name, or a 1 if the passed value is not recognized.
+########################################
+_get_survey() {
+  case "${1:?}" in
+    i)
+      echo 'interview'
+      ;;
+    I)
+      echo 'Interview'
+      ;;
+    d)
+      echo 'diary'
+      ;;
+    D)
+      echo 'Diary'
+      ;;
+    *)
+      _print_error '%s\n' "${FUNCNAME[0]}: $1 $UNEXPECTED_SURVEY_CODE"
+      return 1
+      ;;
+  esac
+}
+
+########################################
+# Evaluates the first directory name in the path of the script that is being
+# executed and outputs a string that can be prepended to other file paths.
+# Globals:
+#   FUNCNAME
+#   HOME
+# Arguments:
+#   None
+# Outputs:
+#   If the first directory name is 'shared' then a blank is output to stdout. If
+#   the first directory name is 'acceptance' then '/acceptance' is output to
+#   stdout. If the first direcotry name is 'home' then the home directory of the
+#   account executing the script is output to stdout. In any other case an error
+#   message is output to stderr.
+########################################
+_get_top_level_directory() {
+  local tl
+  tl=$(realpath $0 | cut -d '/' -f 2)
+  case "$tl" in
+    shared)
+      echo
+      ;;
+    acceptance)
+      echo "/$tl"
+      ;;
+    home)
+      echo "$HOME"
+      ;;
+    *)
+      _print_error '%s\n' "${FUNCNAME[0]}: $1 $UNEXPECTED_TOP_LEVEL"
+      return 1
+      ;;
+  esac
+}
+
+########################################
+# Performs a git checkout of the dvlp branch (or the main branch if there is no
+# dvlp branch) and then does a git pull.
+# Arguments:
+#   none
+# Ouputs:
+#   A message to stderr if the current directory is not a part of a Git
+#   repository.
+#   A message to stderr if the neither a dvlp or main branch is found for the
+#   repository.
+# Returns:
+#   1 if the current directory is not a part of a Git repository.
+#   2 is there it not possible to checkout a dvlp or a main branch.
+########################################
+_git_pull() {
+  branch=$(git rev-parse --symbolic --verify dvlp 2>/dev/null) ||
+  branch=$(git rev-parse --symbolic --verify main 2>/dev/null) ||
+  git rev-parse >/dev/null 2>&1 ||
+    {
+      _print_error '%s\n' "$PWD $NOT_GIT_REPO"
+      return 1
+    }
+  if [ -z "$branch" ]; then
+    _print_error '%s\n' 'No dvlp or main branch found for this repository'
+    return 2
+  fi
+  git checkout $branch && git pull
+}
+
+########################################
+# Attempts a git push, if the push is not successful because the current branch
+# has no upstream branch then a second git push is attempted using the command
+# provided by git.
+# Arguments:
+#   none
+# Ouputs:
+#   A message to stderr if the current directory is not a part of a Git
+#   repository.
+#   A message to stderr if the current branch is a static branch.
+# Returns:
+#   1 if the current directory is not a part of a Git repository.
+#   2 if the current branch is a static branch.
+########################################
+_git_push() {
+  git rev-parse 2>/dev/null ||
+    {
+      _print_error '%s\n' "$PWD $NOT_GIT_REPO"
+      return 1
+    }
+  branch=$(_git_branch)
+  case "$branch" in
+    dvlp|acct|sit|main)
+      _print_error '%s\n' "Pushing to $branch is forbidden"
+      return 2
+      ;;
+  esac
+  push_out=$(git push 2>&1 >/dev/null) && echo "$push_out" ||
+    {
+      push_cmd=$(awk '/git push/ && !/HEAD:/' <<< "$push_out")
+      [ -z "$push_cmd" ] && echo "$push_out" || bash -c "$push_cmd"
+    }
 }
 
 ########################################
@@ -171,6 +438,84 @@ _display_menu() {
 ########################################
 _git_branch() {
   git symbolic-ref --short -q HEAD || git rev-parse HEAD || return 1
+}
+
+########################################
+# The last common ancestor commit from the time that the branch was created.
+# This gives the same result as 'git merge-base' would except that it continues
+# to provide the same commit after the forked branch is merged back into the
+# original branch.
+# Arguments:
+#   1 - forked branch
+#   2 - original branch
+# Ouputs:
+#   The last common ancestor commit from the time that the branch was created.
+########################################
+_git_common_ancestor() {
+  diff -u <(git rev-list --first-parent ${1:?}) \
+    <(git rev-list --first-parent ${2:?}) | sed -n '4,/^ / s/^ \(.*\)/\1/p'
+}
+
+########################################
+# Outputs a developemnt note for all of the comitted changes made to a local
+# when compared to a baseline stable branch. If a branch name is not specified
+# then the current branch will be treated as the target branch. The target
+# branch will compared to the dvlp branch for repositories that have a dvlp
+# branch and the main branch for repositories that do not.
+# Arguments:
+#   the name of a local branch (optional)
+# Ouputs:
+#   A message to stderr if the current directory is not a part of a Git
+#   repository.
+#   A message to stderr if the name of branch passed as an argument is not found
+#   in the Git repository.
+#   A message to stderr if there were no committed changes found to list in the
+#   development note.
+#   The development note to stdout.
+# Returns:
+#   1 if the current directory is not a part of a Git repository.
+#   2 if the name of branch passed as an argument is not found in the Git
+#   repository.
+#   3 if there are no differences found between the baseline branch and the
+#   target branch.
+########################################
+_gen_dev_note() {
+  top_level=$(git rev-parse --show-toplevel 2>/dev/null) ||
+    {
+      _print_error '%s\n' "$PWD $NOT_GIT_REPO"
+      return 1
+    }
+  if [ -z "$1" ]; then
+    branch=$(_git_branch)
+  else
+    branch=$1
+    git show-ref --verify --quiet refs/heads/$branch ||
+      {
+        _print_error '%s\n' "$branch $NOT_GIT_BRANCH"
+        return 2
+      }
+  fi
+  for comp_branch in dvlp main; do
+    git show-ref --verify --quiet refs/heads/$comp_branch && break
+  done
+  file_list=$(_git_common_ancestor $branch $comp_branch |
+    xargs git diff --name-only $branch)
+  if [ -z "$file_list" ]; then
+    _print_error '\n%s\n' \
+      "No differences were found between $branch and $comp_branch"
+    return 3
+  fi
+  repo=$(sed -n 's/^[[:space:]]\+url = .*\/\(.*\)\.git/\1/p' \
+    $top_level/.git/config)
+  tput setaf '2'
+  case "$repo" in
+    dceis-ies|dceis-ees|dceis-shared)
+      printf '\n%s\n\n' 'Development is complete' ;;
+  esac
+  printf '%s ' 'The following changes have been pushed to the'
+  printf '%s\n\n' "$comp_branch branch of the $repo Git repo:"
+  printf '%s\n\n' "$file_list"
+  tput setaf '7'
 }
 
 ########################################
@@ -190,7 +535,7 @@ _git_branch() {
 ########################################
 _git_branch_selector() {
   if [ "$1" != '--no-pull' ] && ! _git_pull; then
-    _print_error "$PWD $NOT_GIT_REPO" '%s\n'
+    _print_error '%s\n' "$PWD $NOT_GIT_REPO"
     return 1
   fi
 
@@ -219,14 +564,14 @@ _git_branch_selector() {
       ;;
     [0-9]*)
       if [ -z "${optslist[$usrin]}" ]; then
-        _print_error "$usrin $NOT_RECOGNIZED_OPTION" '\n%s\n'
+        _print_error '\n%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
         _git_branch_selector '--no-pull'
       else
         git checkout "${optslist[$usrin]}"
       fi
       ;;
     *)
-      _print_error "$usrin $NOT_RECOGNIZED_OPTION" '\n%s\n'
+      _print_error '\n%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
       _git_branch_selector '--no-pull'
       ;;
   esac
