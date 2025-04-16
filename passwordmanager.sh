@@ -1,223 +1,258 @@
-#!/bin/bash
+#!/usr/bin/env bash
+################################################################################
+# Script:   passwordmanager.sh                                                 #
+# Function:                                                                    #
+# Usage:    passwordmanager.sh [-h]                                            #
+#                                                                              #
+# Author: Robert Winslow                                                       #
+# Date written: 04-14-2025                                                     #
+#                                                                              #
+################################################################################
+. $(dirname $0)/common.functions
 
-. $LIB_LOC/common.functions
+USAGE_STR='[-h] user'
 
-declare -r USAGE_STR='[-h] [user]'
+########################################
+# Prints this script's help message.
+# Globals:
+#   DOC_PAGE
+# Arguments:
+#   None
+# Outputs:
+#   The help message
+########################################
+_help() {
+  printf 'Usage: %s\n' "$(basename $0) $USAGE_STR"
+  printf '%s\n\n' 'Program description goes here.'
+  printf '  %-16s%s\n' '-h' 'Print this help message'
+  exit 0
+}
 
 _start() {
-   cd $toplevel
-   if [ -f "$encfile" ]; then
-      for i in 1 2 3; do
-         secure.sh -d $encfile
-         if [ $? -eq 0 ]; then
-            break
-         elif [ $i -eq 3]; then
-            exit 101
-         fi
-      done
-   fi
+  cd $toplevel
+  if [ -f "$encfile" ]; then
+    for i in 1 2 3; do
+      $thisdir/secure.sh -d $encfile ||
+        {
+          _print_error '%s\n\n' 'Decryption failed'
+          return 1
+        }
+      if [ $? -eq 0 ]; then
+        break
+      elif [ $i -eq 3]; then
+        _print_error '%s\n\n' 'Authentication failed'
+        return 2
+      fi
+    done
+  fi
 }
 
 _stop() {
-   secure.sh -e "$user:$secdir"
-   cd -
+  $thisdir/secure.sh -e "$user:$secdir" ||
+    {
+      _print_error '%s\n\n' 'Encryption failed'
+      exit 98
+    }
 }
 
 _menu() {
-   local menuopts
-   menuopts=("$@")
-   _display_menu "${menuopts[@]}"
-   local usrin lastopt=$((${#menuopts[@]}-1))
-   read -t $wait_time -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
-   echo
-   case "$usrin" in
-      [0-9]*)
-         _${menuopts[$usrin],}
-         ;;
-      ""|[Qq]*)
-         _quit
-         ;;
-      *)
-         clear
-         printf '%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
-         ;;
-   esac
+  local menuopts
+  menuopts=("$@")
+  _display_menu "${menuopts[@]}"
+  local usrin lastopt=$((${#menuopts[@]}-1))
+  read -t $wait_time -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
+  echo
+  case "$usrin" in
+    [0-9]*)
+      _${menuopts[$usrin],}
+      ;;
+    ""|[Qq]*)
+      exit 0
+      ;;
+    *)
+      _clear $debug
+      printf '%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
+      ;;
+  esac
 }
 
 _main_menu() {
-   printf '%s\n' 'MAIN MENU'
-   if [ -f "$outfile" ]; then
-      _menu 'Select one of the following options' 'List' 'Add' 'Quit'
-   else
-      _menu 'Select one of the following options' 'Add' 'Quit'
-   fi
-   _main_menu
+  local prompt menu_items
+  printf '%s\n' 'MAIN MENU'
+  prompt='Select one of the following options'
+  menu_items="Add Quit"
+  if [ -f "$outfile" ]; then
+    menu_items="List $menu_items"
+  fi
+  _menu "$prompt" $menu_items
+  _main_menu
 }
 
 _list() {
-   clear
-   printf '%s\n' 'ACCOUNT LIST'
-   declare -a listopts=('Please choose one of the following accounts (or press any other key to return to the main menu)')
-   for line in $(cat $outfile); do
-      listopts+=(${line%%:*})
-   done
-   listopts+=('Back to Main Menu')
-   _display_menu "${listopts[@]}"
-   local usrin lastopt=$((${#listopts[@]}-1))
-   read -t $wait_time -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
-   echo
-   case "$usrin" in
-      ""|$lastopt)
-         clear
-         _main_menu
-         ;;
-      [0-9]*)
-         _select $usrin
-         ;;
-      [Qq]*)
-         _quit
-         ;;
-      *)
-         clear
-         printf '%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
-         ;;
-   esac
-   _list
+  _clear $debug
+  printf '%s\n' 'ACCOUNT LIST'
+  mapfile -t listopts < <(awk -F ':' '{print $1}' $outfile)
+  listopts=('Please choose one of the following accounts' "${listopts[@]}" \
+    'Back to Main Menu')
+  _display_menu "${listopts[@]}"
+  local usrin lastopt=$((${#listopts[@]}-1))
+  read -t $wait_time -p "Enter Choice [1-$lastopt] " usrin
+  echo
+  case "$usrin" in
+    ""|$lastopt)
+      _clear $debug
+      _main_menu
+      ;;
+    [0-9]*)
+      _select "${listopts[$usrin]}"
+      ;;
+    [Qq]*)
+      exit 0
+      ;;
+    *)
+      _clear $debug
+      printf '%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
+      ;;
+  esac
+  _list
 }
 
 _add() {
-   clear
-   read -p 'Please enter the name of this account: ' accname
-   if [ -f "$outfile" ] && grep -q "$accname" $outfile; then
-      clear
-      _print_error 'This name already exists.'
-      return 81
-   fi
-   read -p 'Please enter the user name for this account: ' usrname
-   read -p 'Please specify the password length (press enter for default) : ' length
-   read -p 'Please specify the number of special characters for the password (press enter for default) : ' numspec
-   read -p "Please specify any special characters ($special_chars) that should not be used (press enter for default): " excspec
-   local args
-   if [ -n "$length" ]; then
-      args=" -l $length"
-   fi
-   if [ -n "$numspec" ]; then
-      args="$args -n $numspec"
-   fi
-   if [ -n "$excspec" ]; then
-      spchars=$(echo "$special_chars" | tr -d "$excspec")
-      args="$args -s $spchars"
-   fi
-   str=$(printrandom.sh $args)
-   rc=$?
-   if [ $rc -eq 0 ]; then
-      echo "$accname:$length:$numspec:$espchars:$usrname/$str" >>$outfile
-   else
-      clear
-      _print_error 'An error ocurred while generating a new password.'
-      return $rc
-   fi
-   accinfo=$(grep "^$accname" $outfile)
-   _show
-   clear
+  _clear $debug
+  read -p 'Please enter the name of this account: ' accname
+  if [ -f "$outfile" ] && grep -q "$accname" $outfile; then
+    _clear $debug
+    _print_error 'This name already exists.'
+    return 81
+  fi
+  read -p 'Please enter the user name for this account: ' usrname
+  printf '%s' 'Please specify the password length (press enter for default) : '
+  read length
+  printf '%s' 'Please specify the number of special characters for the password'
+  read -p ' (press enter for default) : ' numspec
+  printf '%s' "Please specify any special characters ($special_chars) that"
+  read -p ' should not be used (press enter for default): ' excspec
+  local args
+  if [ -n "$length" ]; then
+    args=" -l $length"
+  fi
+  if [ -n "$numspec" ]; then
+    args="$args -n $numspec"
+  fi
+  if [ -n "$excspec" ]; then
+    spchars=$(echo "$special_chars" | tr -d "$excspec")
+    args="$args -s $spchars"
+  fi
+  str=$($thisdir/printrandom.sh $args)
+  rc=$?
+  if [ $rc -ne 0 ]; then
+    _clear $debug
+    _print_error '%s\n\n' 'An error ocurred while generating a new password'
+    return $rc
+  fi
+  echo "$accname:$length:$numspec:$espchars:$usrname/$str" >>$outfile
+  accinfo=$(grep "^$accname" $outfile)
+  _show
+  _clear $debug
 }
 
 _quit() {
-   exit 0
+  exit 0
 }
 
 _select() {
-   clear
-   if [ -z "$1" ]; then
-      _invalid_argument ${FUNCNAME[0]}
-   fi
-   linenum=$1
-   accinfo=$(sed "${1}q;d" $outfile)
-   accname=${accinfo%%:*}
-   _menu "Select on of the following actions for account $accname" 'Update' 'Delete' 'Show'
-   _list
+  accname="${1:?}"
+  _clear $debug
+  _menu "Select one of the following actions for account $accname" 'Update' \
+    'Delete' 'Show'
+  _list
 }
 
 _update() {
-   length=$(echo "$accinfo" | cut -d : -f 2)
-   numspec=$(echo "$accinfo" | cut -d : -f 3)
-   excspec=$(echo "$accinfo" | cut -d : -f 4)
-   local args
-   if [ -n "$length" ]; then
-      args=" -l $length"
-   fi
-   if [ -n "$numspec" ]; then
-      args="$args -n $numspec"
-   fi
-   if [ -n "$excspec" ]; then
-      spchars=$(echo "$special_chars" | tr -d "$excspec")
-      args="$args -s $spchars"
-   fi
-   str=$(printrandom.sh $args)
-   rc=$?
-   if [ $rc -eq 0 ]; then
-      sed -i "s/^\($accname.*\/\).*/\1$str/" $outfile
-   else
-      clear
-      _print_error 'An error ocurred while generating a new password.'
-      return $rc
-   fi
-   printf '%s\n' "$accname updated."
-   accinfo=$(sed "${linenum}q;d" $outfile)
-   _show
+  length=$(echo "$accinfo" | cut -d : -f 2)
+  numspec=$(echo "$accinfo" | cut -d : -f 3)
+  excspec=$(echo "$accinfo" | cut -d : -f 4)
+  local args
+  if [ -n "$length" ]; then
+    args=" -l $length"
+  fi
+  if [ -n "$numspec" ]; then
+    args="$args -n $numspec"
+  fi
+  if [ -n "$excspec" ]; then
+    spchars=$(echo "$special_chars" | tr -d "$excspec")
+    args="$args -s $spchars"
+  fi
+  str=$($thisdir/printrandom.sh $args)
+  rc=$?
+  if [ $rc -ne 0 ]; then
+    _clear $debug
+    _print_error '%s\n\n' 'An error ocurred while generating a new password'
+    return $rc
+  fi
+  sed -i "s/^\($accname.*:.*\/\).*/\1$str/" $outfile
+  printf '%s\n' "$accname updated."
+  _show
 }
 
 _delete() {
-   clear
-   local usrin
-   read -p "Are you sure that you want to delete $accname? " usrin
-   case "$usrin" in
-      [Yy]*)
-         sed -i "${linenum}d" $outfile
-         printf '%s\n' "$accname deleted."
-         read -n 1 -p "$ANY_KEY_CONTINUE"
-   esac
+  _clear $debug
+  local usrin
+  if _yes_no_prompt "Are you sure that you want to delete $accname?"; then
+    sed -i "/^$accname/d" $outfile
+    printf '%s\n' "$accname deleted."
+    read -t $wait_time -n 1 -p "$ANY_KEY_CONTINUE"
+  fi
 }
 
 _show() {
-   local creds=${accinfo##*:}
-   usrname=$(echo "$creds" | cut -d / -f 1)
-   str=$(echo "$creds" | cut -d / -f 2)
-   i=0
-   while [ $i -lt $wait_time ]; do
-      clear
-      echo "$str" > /dev/clipboard
-      ((i=i+1))
-      printf '%s - %s (%s)' "${accname^^}" "$usrname" "$i"
-      sleep 1
-   done
-   echo > /dev/clipboard
+  local creds username str
+  accinfo=$(grep "^$accname" $outfile)
+  creds=${accinfo##*:}
+  usrname=$(echo "$creds" | cut -d / -f 1)
+  str=$(echo "$creds" | cut -d / -f 2)
+  _clear $debug
+  echo "$str" | wl-copy
+  printf '%s - %s\n' "${accname^^}" "$usrname"
+  read -t $wait_time -n 1 -p "$ANY_KEY_CONTINUE"
+  echo | wl-copy
 }
 
+####################
+# passwordmanager.sh START
+####################
+
+if [ "$1" = '--debug' ]; then
+  debug=$1
+  shift
+fi
+
 while getopts 'h' OPT; do
-   case "$OPT" in
-      h|*) _usage ;;
-   esac
+  case "$OPT" in
+    h) _help ;;
+    *) _usage ;;
+  esac
 done
 
 shift $((OPTIND-1))
 
 if [ $# -ne 1 ]; then
-   _invalid_arguments "$@"
+  _invalid_arguments "$@"
 fi
 
-user="$1"
-toplevel='/c/users/winsl'
-secdir='Documents/secure'
+user="${1:?}"
+toplevel="$HOME"
+thisdir="$(realpath passwordmanager.sh | xargs dirname)"
+secdir='secure'
 outfile="$secdir/.passfile"
 encfile='secure.tar.gpg'
 special_chars='@#$%&_+='
-wait_time=30
+wait_time=300
 
 trap _stop EXIT
 
-_start
-
-clear
-
+_start || { _print_error '%s\n\n' 'Failed to start'; exit 99; }
+_clear $debug
 _main_menu
+
+exit 0

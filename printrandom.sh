@@ -1,52 +1,81 @@
-#!/bin/bash
+#!/usr/bin/env bash
+################################################################################
+# Script:   printrandom.sh                                                     #
+# Function:                                                                    #
+# Usage:    printrandom.sh [-h]                                                #
+#                                                                              #
+# Author: Robert Winslow                                                       #
+# Date written: 04-14-2025                                                     #
+#                                                                              #
+################################################################################
+. $(dirname $0)/common.functions
 
-. $LIB_LOC/common.functions
+USAGE_STR='[-h] [-l length] [-n num_special_chars] [-s special_chars]'
 
-USAGE_STR='[-l length] [-n #_special_chars] [-s special_chars]'
-LENGTH=15
-NUM_SPECIAL=1
-SPECIAL_CHARS='@#$%&_+='
-
-_set_length() {
-   if _int_test $1; then
-      LENGTH=$1
-   else
-      exit $?
-   fi
+########################################
+# Prints this script's help message.
+# Globals:
+#   DOC_PAGE
+# Arguments:
+#   None
+# Outputs:
+#   The help message
+########################################
+_help() {
+  printf 'Usage: %s\n' "$(basename $0) $USAGE_STR"
+  printf '%s\n\n' 'Program description goes here.'
+  printf '  %-16s%s\n' '-h' 'Print this help message'
+  exit 0
 }
 
-_set_num_special() {
-   if _int_test $1; then
-      NUM_SPECIAL=$1 
-      LENGTH=$(($LENGTH - $NUM_SPECIAL))
-   else
-      exit $?
-   fi
+_set_parameters() {
+  length=${1-16}
+  num_special=${2-1}
+  echo "debug length $length num_special $num_special"
+  if ! _int_test $length; then
+    _print_error '%s\n\n' "length is not a valid integer"
+    exit 99
+  elif ! _int_test $num_special; then
+    _print_error '%s\n\n' "num_special is not a valid integer"
+    exit 98
+  else
+    if [ $length -ge $num_special ]; then
+      length=$(($length - $num_special))
+    else
+      _print_error '%s\n\n' \
+        'The number of special characters cannot exceed the length'
+      exit 97
+    fi
+  fi
 }
 
-_set_special_chars() {
-   SPECIAL_CHARS="$1"
-}
+####################
+# printrandom.sh START
+####################
+special_chars='@#$%&_+='
 
-while getopts 'l:n:s:' OPT; do
-   case "$OPT" in
-      l) _set_length $OPTARG ;;
-      n) _set_num_special $OPTARG  ;;
-      s) _set_special_chars $OPTARG  ;;
-      *) _usage "$USAGE_STR" ;;
-   esac
+while getopts 'hl:n:s:' OPT; do
+  case "$OPT" in
+    h) _help ;;
+    l) length=$OPTARG ;;
+    n) num_special=$OPTARG  ;;
+    s) special_chars="$OPTARG"  ;;
+    *) _usage "$USAGE_STR" ;;
+  esac
 done
 
 shift $((OPTIND-1))
 
 if [ $# -ne 0 ]; then
-   _usage "$USAGE_STR"
+  _invalid_arguments "$@"
 fi
 
+_set_parameters $length $num_special
+
 {
-   </dev/urandom LC_ALL=C grep -ao '[A-Za-z0-9]' | head -n$LENGTH
-   for i in $(seq $NUM_SPECIAL); do
-      echo ${SPECIAL_CHARS:$((RANDOM % ${#SPECIAL_CHARS})):1} 
+   </dev/urandom LC_ALL=C grep -ao '[A-Za-z0-9]' | head -n $length
+   for i in $(seq $num_special); do
+      echo ${special_chars:$((RANDOM % ${#special_chars})):1}
    done
 } | shuf | tr -d '\n'
 
