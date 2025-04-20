@@ -58,8 +58,8 @@ while getopts 'hl:n:s:' OPT; do
   case "$OPT" in
     h) _help ;;
     l) length=$OPTARG ;;
-    n) num_special=$OPTARG  ;;
-    s) special_chars="$OPTARG"  ;;
+    n) num_special=$OPTARG ;;
+    s) special_chars="$OPTARG" ;;
     *) _usage "$USAGE_STR" ;;
   esac
 done

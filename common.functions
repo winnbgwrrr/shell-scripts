@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 declare -r NO_FILE_NO_DIRECTORY='No such file or directory'
+declare -r MISSING_ARGUMENT='missing argument'
 declare -r INVALID_ARGUMENTS='invalid arguments'
 declare -r NOT_INTEGER='is not an integer'
 declare -r NOT_RECOGNIZED_OPTION='is not a recognized option'
@@ -9,24 +10,28 @@ declare -r NOT_GIT_REPO='is not a Git repository'
 declare -r NOT_GIT_BRANCH='is not a branch in this Git repository'
 
 ########################################
-# Prints an error message to stderr with either the default format or one can
-# be passed to the function.
+# Prints an error message to stderr with a specified format and message. If only
+# one argument is provided it is output as the message using the default format.
 # Arguments:
-#   The message
-#   The format (optional)
+#   If only one argument is provided then that argument will be output as the
+#   message using the default format('ERROR: %s\n')
+#   Otherwise, arguments behave the same as is calling printf
 # Outputs:
-#   The message to stderr
+#   If no arguments are provided a missing argument message is output to stderr
+#   If one or more arguments are provided the message is output to stderr
 ########################################
 _print_error() {
-  local error_message fmt
+  local fmt
   fmt='ERROR: %s\n'
-  if [ $# -eq 2 ]; then
+  if [ $# -eq 0 ]; then
+    _print_error '%s: %s\n' ${FUNCNAME[0]} "$MISSING_ARGUMENT"
+    return 1
+  elif [ $# -gt 1 ]; then
     fmt="$1"
     shift
   fi
-  error_message="${1:?}"
   tput setaf '1'
-  printf "$fmt" "$error_message" >&2
+  printf "$fmt" "$@" >&2
   tput setaf '7'
 }
 
@@ -34,10 +39,12 @@ _print_error() {
 # Prints the scripts usage message and exits with code 100.
 # Globals:
 #   USAGE_STR
+#   DOC_PAGE
 # Arguments:
 #   None
 # Outputs:
 #   The useage message is output to stderr
+#   An optional documentation page message is output to stderr
 ########################################
 _usage() {
   script_name=$(basename $0)
