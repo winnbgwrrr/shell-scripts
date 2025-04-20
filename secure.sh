@@ -66,14 +66,6 @@ _decrypt() {
 # secure.sh START
 ####################
 
-script=$(basename $0)
-name='secure'
-decrypted_dir="$HOME/Documents"
-secure_dir="$HOME/.secure"
-tar_file="$secure_dir/$(_get_random_string 8 'A-Za-z0-9').tar"
-gpg_file="$secure_dir/$name.tar.gpg"
-user="Robert A Winslow"
-
 while getopts 'h' OPT; do
   case "$OPT" in
     h|*)
@@ -84,9 +76,11 @@ done
 
 shift $((OPTIND-1))
 
+secure_dir="$HOME/.secure"
 if [ ! -d "$secure_dir" ]; then
   mkdir $secure_dir && chmod 700 $secure_dir
 fi
+. $secure_dir/config
 
 if [ $# -ne 1 ]; then
    _invalid_arguments "$@"
