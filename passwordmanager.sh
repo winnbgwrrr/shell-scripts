@@ -10,7 +10,7 @@
 ################################################################################
 . $(dirname $0)/common.functions
 
-USAGE_STR='[-h] user'
+USAGE_STR='[-h]'
 
 ########################################
 # Prints this script's help message.
@@ -29,26 +29,23 @@ _help() {
 }
 
 _start() {
-  cd $toplevel
-  if [ -f "$encfile" ]; then
-    for i in 1 2 3; do
-      $thisdir/secure.sh -d $encfile ||
-        {
-          _print_error '%s\n\n' 'Decryption failed'
-          return 1
-        }
-      if [ $? -eq 0 ]; then
-        break
-      elif [ $i -eq 3]; then
-        _print_error '%s\n\n' 'Authentication failed'
-        return 2
-      fi
-    done
-  fi
+  for i in 1 2 3; do
+    $secure decrypt ||
+      {
+        _print_error '%s\n\n' 'Decryption failed'
+        return 1
+      }
+    if [ $? -eq 0 ]; then
+      break
+    elif [ $i -eq 3]; then
+      _print_error '%s\n\n' 'Authentication failed'
+      return 2
+    fi
+  done
 }
 
 _stop() {
-  $thisdir/secure.sh -e "$user:$secdir" ||
+  $secure encrypt ||
     {
       _print_error '%s\n\n' 'Encryption failed'
       exit 98
@@ -143,7 +140,7 @@ _add() {
     spchars=$(echo "$special_chars" | tr -d "$excspec")
     args="$args -s $spchars"
   fi
-  str=$($thisdir/printrandom.sh $args)
+  str=$($random $args)
   rc=$?
   if [ $rc -ne 0 ]; then
     _clear $debug
@@ -183,7 +180,7 @@ _update() {
     spchars=$(echo "$special_chars" | tr -d "$excspec")
     args="$args -s $spchars"
   fi
-  str=$($thisdir/printrandom.sh $args)
+  str=$($random $args)
   rc=$?
   if [ $rc -ne 0 ]; then
     _clear $debug
@@ -236,16 +233,13 @@ done
 
 shift $((OPTIND-1))
 
-if [ $# -ne 1 ]; then
+if [ $# -ne 0 ]; then
   _invalid_arguments "$@"
 fi
 
-user="${1:?}"
-toplevel="$HOME"
-thisdir="$(realpath passwordmanager.sh | xargs dirname)"
-secdir='secure'
-outfile="$secdir/.passfile"
-encfile='secure.tar.gpg'
+secure="$(dirname $0)/secure.sh"
+random="$(dirname $0)/printrandom.sh"
+outfile="$HOME/Documents/secure/.passfile"
 special_chars='@#$%&_+='
 wait_time=300
 
