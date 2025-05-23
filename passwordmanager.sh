@@ -53,12 +53,11 @@ _stop() {
 }
 
 _menu() {
-  local menuopts
+  local usrin lastopt
   menuopts=("$@")
   _display_menu "${menuopts[@]}"
-  local usrin lastopt=$((${#menuopts[@]}-1))
-  read -t $wait_time -n ${#lastopt} -p "Enter Choice [1-$lastopt] " usrin
-  echo
+  lastopt=$((${#menuopts[@]}-1))
+  read -t $wait_time -p "Enter Choice [1-$lastopt] " usrin
   case "$usrin" in
     [0-9]*)
       _${menuopts[$usrin],}

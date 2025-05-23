@@ -235,14 +235,13 @@ _display_menu() {
   for i in ${!menuopts[@]}; do
     if [ $i -eq 0 ]; then
       printf '%s\n' "${menuopts[$i]}"
+      continue
+    elif [ -n "$length" ]; then
+      menuopt="$(_truncate $length ${menuopts[$i]})"
     else
-      if [ -n "$length" ]; then
-        menuopt="$(_truncate $length ${menuopts[$i]})"
-      else
-        menuopt="${menuopts[$i]}"
-      fi
-      printf '  %s\t%s\n' "$i)" "$menuopt"
+      menuopt="${menuopts[$i]}"
     fi
+    printf '  %s\t%s\n' "$i)" "$menuopt"
   done
 }
 

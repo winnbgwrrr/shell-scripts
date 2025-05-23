@@ -31,7 +31,6 @@ _help() {
 _set_parameters() {
   length=${1-16}
   num_special=${2-1}
-  echo "debug length $length num_special $num_special"
   if ! _int_test $length; then
     _print_error '%s\n\n' "length is not a valid integer"
     exit 99
