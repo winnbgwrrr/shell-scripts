@@ -29,7 +29,7 @@ _help() {
 }
 
 _search() {
-  local message usrin lastopt sel
+  local message usrin lastopt
   declare -A locations
   declare -a optslist
   locations[hypr-config]="$HOME/.config/hypr/config"
@@ -49,7 +49,7 @@ _search() {
     fi
   done
   optslist+=('Quit')
-#  clear
+  clear
   [ -n "$message" ] && printf '%s\n\n' "$message"
   _display_menu "${optslist[@]}"
   lastopt=$((${#optslist[@]}-1))
@@ -59,12 +59,10 @@ _search() {
       return 0
       ;;
     *)
-      sel="${optslist[$usrin]}"
-      if ! _int_test "$usrin" || [ -z "$sel" ]; then
+      if ! _int_test "$usrin" || [ -z "${optslist[$usrin]}" ]; then
         _print_error '%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
       else
-        #message=$(_fuzzy_find_file "${locations[$sel]}") || return 1
-        _fuzzy_find_file "${locations[$sel]}" || return 1
+        _fuzzy_find_file "${locations[${optslist[$usrin]}]}" || return 1
       fi
       ;;
   esac
@@ -87,6 +85,9 @@ _fuzzy_find_file() {
   case "$path" in
     *.sh)
       echo "vim -b $path"
+      ;;
+    *.json)
+      echo "jq '.' | less -S $path"
       ;;
     *)
       echo "less -S $path"
