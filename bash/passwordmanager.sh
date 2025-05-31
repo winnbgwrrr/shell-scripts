@@ -54,6 +54,7 @@ _stop() {
 
 _menu() {
   local usrin lastopt
+  declare -a menuopts
   menuopts=("$@")
   _display_menu "${menuopts[@]}"
   lastopt=$((${#menuopts[@]}-1))
