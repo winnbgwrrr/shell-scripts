@@ -11,7 +11,6 @@
 . $(dirname $0)/common.functions
 
 USAGE_STR='[-h]'
-DOC_PAGE="$CONFLUENCE/TOOL/$(basename $0)"
 
 ####################
 # new_script.sh START
@@ -23,9 +22,6 @@ Usage: $(basename $0) $USAGE_STR
 
   -h            Print this help message
 
-For additional information please reference:
-
-  $DOC_PAGE
 END
 )
 
@@ -54,6 +50,7 @@ if [ -f "$snm" ]; then
 fi
 
 template=$(cat <<'EOF'
+#!/usr/bin/env bash
 ################################################################################
 # Script:                                                                      #
 # Function:                                                                    #
@@ -66,7 +63,6 @@ template=$(cat <<'EOF'
 . $(dirname $0)/common.functions
 
 USAGE_STR='[-h]'
-DOC_PAGE="$CONFLUENCE/TOOL/$(basename $0)"
 
 ####################
 # START
@@ -78,9 +74,6 @@ Usage: $(basename $0) $USAGE_STR
 
   -h            Print this help message
 
-For additional information please reference:
-
-  $DOC_PAGE
 END
 )
 
