@@ -13,7 +13,6 @@
 . $(dirname $0)/common.functions
 
 USAGE_STR='[-h] [-w] [-s] pattern file'
-DOC_PAGE="$CONFLUENCE/TOOL/$(basename $0)"
 
 ########################################
 # Print sections of a file where a specific pattern was found. The pattern
@@ -91,9 +90,6 @@ Usage: $(basename $0) $USAGE_STR
   -s            Case sensitive pattern matching
   -w            Force PATTERN to match only whole words
 
-For additional information please reference:
-
-  $DOC_PAGE
 END
 )
 
