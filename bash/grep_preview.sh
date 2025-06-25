@@ -71,13 +71,15 @@ for ln in ${line_nums[@]}; do
     fi
     eln=$(($ln+$snip_size))
   elif [ $ln -eq 0 ]; then
-    cat -n $file_name | sed -n "s/^ *//;$bln,${eln}p" |
-      grep --color=always ${g_opts}E "$pattern|$"
+    cat -n $file_name | sed -n "$bln,${eln}p" |
+      grep --color=always ${g_opts}E "$pattern|$" |
+      awk '{printf "\033[38;5;187m%s\033[m%s\n", $1, substr($0, 7)}'
   elif [ $ln -lt $(($eln+$snip_size)) ]; then
     eln=$(($ln+$snip_size))
   else
-    cat -n $file_name | sed -n "s/^ *//;$bln,${eln}p" |
-      grep --color=always ${g_opts}E "$pattern|$"
+    cat -n $file_name | sed -n "$bln,${eln}p" |
+      grep --color=always ${g_opts}E "$pattern|$" |
+      awk '{printf "\033[38;5;187m%s\033[m%s\n", $1, substr($0, 7)}'
     tput setaf 67
     printf '\n %s\n\n' "$(for i in {1..80}; do printf '%c' '~'; done)"
     tput sgr0
