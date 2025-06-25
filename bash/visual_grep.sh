@@ -4,7 +4,7 @@
 # Function: An interactive way to grep files that provides a preview of the    #
 #           sections of the file that contain a match.                         #
 #                                                                              #
-# Usage:    visual_grep.sh [-h] [-w] [-s] [-t top_directory] pattern           #
+# Usage:    visual_grep.sh [-h] [-w] [-s] pattern file                         #
 #                                                                              #
 # Author: Robert Winslow                                                       #
 # Date written: 06-02-2025                                                     #
@@ -12,18 +12,24 @@
 ################################################################################
 . $(dirname $0)/common.functions
 
-USAGE_STR='[-h] [-w] [-s] pattern'
+USAGE_STR='[-h] [-w] [-s] pattern file'
+DOC_PAGE="$CONFLUENCE/TOOL/$(basename $0)"
 
-_grep_fzf() {
-  grep -${g_opts}rl "$pattern" \
-    {$HOME,/etc,/usr}/* |
-    fzf --style default --multi --height 100% \
-    --bind 'ctrl-o:become(_print_selected {+}),enter:become(vim -b {+})' \
-    --preview "_generate_preview '$g_opts' '$pattern' {}"
-}
-
+########################################
+# Print sections of a file where a specific pattern was found. The pattern
+# itself will print with the default color that grep uses for highlighting. If
+# multiple sections are printed a colorized separator will print between the
+# sections.
+# Arguments:
+#   Options that need to be used with grep
+#   The pattern that grep will use
+#   The name of the file
+# Outputs:
+#   One or more sections of a file with the pattern highlighted and separator
+#   between sections
+########################################
 _generate_preview() {
-  local g_opts pattern file_name snip_size
+  local g_opts pattern file_name snip_size bln eln
   g_opts="$1"
   pattern="${2:?}"
   file_name="${3:?}"
@@ -56,10 +62,17 @@ _generate_preview() {
   done
 }
 
+########################################
+# Print each argument on a separate line in color.
+# Arguments:
+#   A list of strings
+# Outputs:
+#   Each string on a separate line in color
+########################################
 _print_selected() {
   tput setaf '6'
-  for p in $@; do echo "$p"; done
-  tput setaf '7'
+  printf '%s\n' "$@"
+  tput sgr0
 }
 
 export -f _generate_preview
@@ -105,12 +118,17 @@ done
 
 shift $((OPTIND-1))
 
-if [ $# -ne 1 ]; then
+if [ $# -eq 0 ]; then
   _invalid_arguments "$@"
 fi
 
 pattern="$1"
+shift
+path="$@"
 
-_grep_fzf
+grep -${g_opts}rl "$pattern" $path 2>/dev/null |
+  fzf --style default --multi --height 100% \
+  --bind 'ctrl-o:become(_print_selected {+}),enter:become(vim -b {+})' \
+  --preview "_generate_preview '$g_opts' '$pattern' {}"
 
 exit 0
