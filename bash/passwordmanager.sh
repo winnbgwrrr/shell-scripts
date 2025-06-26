@@ -12,22 +12,6 @@
 
 USAGE_STR='[-h]'
 
-########################################
-# Prints this script's help message.
-# Globals:
-#   DOC_PAGE
-# Arguments:
-#   None
-# Outputs:
-#   The help message
-########################################
-_help() {
-  printf 'Usage: %s\n' "$(basename $0) $USAGE_STR"
-  printf '%s\n\n' 'Program description goes here.'
-  printf '  %-16s%s\n' '-h' 'Print this help message'
-  exit 0
-}
-
 _start() {
   for i in 1 2 3; do
     $secure decrypt ||
@@ -218,6 +202,15 @@ _show() {
 ####################
 # passwordmanager.sh START
 ####################
+help=$(cat <<END
+Program description goes here.
+
+Usage: $(basename $0) $USAGE_STR
+
+  -h            Print this help message
+
+END
+)
 
 if [ "$1" = '--debug' ]; then
   debug=$1
@@ -226,8 +219,13 @@ fi
 
 while getopts 'h' OPT; do
   case "$OPT" in
-    h) _help ;;
-    *) _usage ;;
+    h)
+      printf '%s\n' "$help"
+      exit 0
+      ;;
+    *)
+      _usage
+      ;;
   esac
 done
 

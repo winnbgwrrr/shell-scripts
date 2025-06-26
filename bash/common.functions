@@ -3,7 +3,7 @@
 declare -r NO_FILE_NO_DIRECTORY='No such file or directory'
 declare -r MISSING_ARGUMENT='missing argument'
 declare -r INVALID_ARGUMENTS='invalid arguments'
-declare -r NOT_INTEGER='is not an integer'
+declare -r NOT_INTEGER='is not a valid integer'
 declare -r NOT_RECOGNIZED_OPTION='is not a recognized option'
 declare -r ANY_KEY_CONTINUE='Press any key to continue'
 declare -r NOT_GIT_REPO='is not a Git repository'
@@ -108,7 +108,7 @@ _truncate() {
   shift
   _int_test $length ||
     {
-      _print_error '%s\n' "$length is not a valid integer"
+      _print_error '%s\n' "$length $NOT_INTEGER"
       return 1
     }
   string="${@:?}"
@@ -223,7 +223,7 @@ _display_menu() {
     if _int_test $length; then
       shift
     else
-      _print_error '%s\n' "$length is not a valid integer"
+      _print_error '%s\n' "$length $NOT_INTEGER"
       return 1
     fi
   fi
