@@ -12,30 +12,14 @@
 
 USAGE_STR='[-h] [-l length] [-n num_special_chars] [-s special_chars]'
 
-########################################
-# Prints this script's help message.
-# Globals:
-#   DOC_PAGE
-# Arguments:
-#   None
-# Outputs:
-#   The help message
-########################################
-_help() {
-  printf 'Usage: %s\n' "$(basename $0) $USAGE_STR"
-  printf '%s\n\n' 'Program description goes here.'
-  printf '  %-16s%s\n' '-h' 'Print this help message'
-  exit 0
-}
-
 _set_parameters() {
   length=${1-16}
   num_special=${2-1}
   if ! _int_test $length; then
-    _print_error '%s\n\n' "length is not a valid integer"
+    _print_error '%s\n\n' "length $NOT_INTEGER"
     exit 99
   elif ! _int_test $num_special; then
-    _print_error '%s\n\n' "num_special is not a valid integer"
+    _print_error '%s\n\n' "num_special $NOT_INTEGER"
     exit 98
   else
     if [ $length -ge $num_special ]; then
@@ -51,15 +35,36 @@ _set_parameters() {
 ####################
 # printrandom.sh START
 ####################
+help=$(cat <<END
+Program description goes here.
+
+Usage: $(basename $0) $USAGE_STR
+
+  -h            Print this help message
+
+END
+)
+
 special_chars='@#$%&_+='
 
 while getopts 'hl:n:s:' OPT; do
   case "$OPT" in
-    h) _help ;;
-    l) length=$OPTARG ;;
-    n) num_special=$OPTARG ;;
-    s) special_chars="$OPTARG" ;;
-    *) _usage "$USAGE_STR" ;;
+    h)
+      printf '%s\n' "$help"
+      exit 0
+      ;;
+    l)
+      length=$OPTARG
+      ;;
+    n)
+      num_special=$OPTARG
+      ;;
+    s)
+      special_chars="$OPTARG"
+      ;;
+    *)
+      _usage
+      ;;
   esac
 done
 

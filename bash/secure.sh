@@ -2,7 +2,7 @@
 ################################################################################
 # Script:   secure.sh                                                          #
 # Function:                                                                    #
-# Usage:    secure.sh [-h]                                                     #
+# Usage:    secure.sh [-h] mode                                                #
 #                                                                              #
 # Author: Robert Winslow                                                       #
 # Date written: 04-06-2025                                                     #
@@ -11,22 +11,6 @@
 . $(dirname $0)/common.functions
 
 USAGE_STR='[-h] mode'
-
-########################################
-# Prints this script's help message.
-# Globals:
-#   DOC_PAGE
-# Arguments:
-#   None
-# Outputs:
-#   The help message
-########################################
-_help() {
-  printf 'Usage: %s\n' "$(basename $0) $USAGE_STR"
-  printf '%s\n\n' 'Program description goes here.'
-  printf '  %-16s%s\n' '-h' 'Print this help message'
-  exit 0
-}
 
 _encrypt() {
   if [ ! -d "$decrypted_dir/$name" ]; then
@@ -65,11 +49,24 @@ _decrypt() {
 ####################
 # secure.sh START
 ####################
+help=$(cat <<END
+Create a new bash script file from a template.
+
+Usage: $(basename $0) $USAGE_STR
+
+  -h            Print this help message
+
+END
+)
 
 while getopts 'h' OPT; do
   case "$OPT" in
-    h|*)
-      _usage "$USAGE_STR"
+    h)
+      printf '%s\n' "$help"
+      exit 0
+      ;;
+    *)
+      _usage
       ;;
   esac
 done
