@@ -12,22 +12,6 @@
 
 USAGE_STR='[-h]'
 
-########################################
-# Prints this script's help message.
-# Globals:
-#   DOC_PAGE
-# Arguments:
-#   None
-# Outputs:
-#   The help message
-########################################
-_help() {
-  printf 'Usage: %s\n' "$(basename $0) $USAGE_STR"
-  printf '%s\n\n' 'Program description goes here.'
-  printf '  %-16s%s\n' '-h' 'Print this help message'
-  exit 0
-}
-
 _search() {
   local message usrin lastopt
   declare -A locations

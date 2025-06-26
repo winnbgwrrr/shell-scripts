@@ -59,11 +59,20 @@ pattern="$1"
 shift
 path="$@"
 
+if [ $(tput cols) -gt 175 ]; then
+  layout='right'
+  sep_width=$(($(tput cols)/2-7))
+else
+  layout='up'
+  sep_width=$(($(tput cols)-7))
+fi
+
 tput setaf '6'
 grep ${g_opts}rl "$pattern" $path 2>/dev/null |
   fzf --style default --multi --height 100% \
   --bind 'ctrl-o:become(printf "%s\n" {+}),enter:become(vim -b {+})' \
-  --preview "grep_preview.sh $g_opts '$pattern' {}"
+  --preview "grep_preview.sh $g_opts '$pattern' {} $sep_width" \
+  --preview-window $layout
 tput sgr0
 
 exit 0

@@ -39,7 +39,6 @@ _print_error() {
 # Prints the scripts usage message and exits with code 100.
 # Globals:
 #   USAGE_STR
-#   DOC_PAGE
 # Arguments:
 #   None
 # Outputs:
@@ -50,9 +49,6 @@ _usage() {
   script_name=$(basename $0)
   _print_error 'Usage: %s\n' "$script_name $USAGE_STR"
   _print_error '%s\n' "Try '$script_name -h' for more information."
-  if [ ! -z "$DOC_PAGE" ]; then
-    _print_error '%s\n' "Or reference: $DOC_PAGE"
-  fi
   exit 100
 }
 
