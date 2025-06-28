@@ -69,7 +69,7 @@ fi
 
 tput setaf '6'
 grep ${g_opts}rl "$pattern" $path 2>/dev/null |
-  fzf --style default --multi --height 100% \
+  fzf --style default --multi --height 100% --exit-0 \
   --bind 'ctrl-o:become(printf "%s\n" {+}),enter:become(vim -b {+})' \
   --preview "grep_preview.sh $g_opts '$pattern' {} $sep_width" \
   --preview-window $layout
