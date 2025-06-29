@@ -25,7 +25,7 @@ Usage: $(basename $0) $USAGE_STR
 END
 )
 
-while getopts 'hde:' OPT; do
+while getopts 'hde:r:' OPT; do
   case "$OPT" in
     h)
       printf '%s\n' "$help"
@@ -36,6 +36,9 @@ while getopts 'hde:' OPT; do
       ;;
     e)
       exclude_list="$OPTARG"
+      ;;
+    r)
+      remove_list="$OPTARG"
       ;;
     *)
       _usage
@@ -81,6 +84,16 @@ for sh in "${scripts[@]}"; do
     diff -Nu $bin_dir/$sh $git_dir/*/$sh >$patch &&
       rm $patch || patch -p4 <$patch
   fi
+done
+
+if [ -n "$remove_list" ]; then
+  printf '\n%s\n\n' "$(for i in {1..80}; do printf '%c' '-'; done)"
+fi
+for r in $remove_list; do
+  if [ "$mode" != 'dry-run' ]; then
+    rm "$r"
+  fi
+  printf '%s was removed\n' "$r"
 done
 
 chmod 750 $bin_dir/*.sh
