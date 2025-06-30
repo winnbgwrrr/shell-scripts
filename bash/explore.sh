@@ -34,7 +34,6 @@ _main_menu() {
   done
   optslist+=('Working Directory')
   optslist+=('Quit')
-  clear
   _display_menu "${optslist[@]}"
   lastopt=$((${#optslist[@]}-1))
   read -p "Enter Choice [1-$lastopt] " usrin
@@ -43,14 +42,16 @@ _main_menu() {
       return 0
       ;;
     $(($lastopt-1)))
-      _finder || read -n 1 -p "$ANY_KEY_CONTINUE"
+      clear
+      _finder
       ;;
     *)
       if ! _int_test "$usrin" || [ -z "${optslist[$usrin]}" ]; then
-        _print_error '\n%s\n\n' "$usrin $NOT_RECOGNIZED_OPTION"
+        clear
+        _print_error '%s\n\n' "$usrin $NOT_RECOGNIZED_OPTION"
       else
-        ( cd "${locations[${optslist[$usrin]}]}";  _finder; ) ||
-          read -n 1 -p "$ANY_KEY_CONTINUE"
+        clear
+        ( cd "${locations[${optslist[$usrin]}]}";  _finder; )
       fi
       ;;
   esac
@@ -61,9 +62,9 @@ _finder() {
   local path
   path=$(find * -maxdepth 3 -not -path '*.git/*' 2>/dev/null | fzf) || return 0
   if [ -d "$path" ]; then
-    pushd "$path" #>/dev/null
+    pushd "$path" >/dev/null
     _finder
-    popd #>/dev/null 2>&1
+    popd >/dev/null
   else
     _open_file "$path" || return 1
     _finder
@@ -85,7 +86,7 @@ _open_file() {
       ;;
     *)
       if [ "$(file "$file" --mime-encoding | cut -d ' ' -f 2)" = 'binary' ]; then
-        _print_error '\n%s is a binary file\n\n' "$file"
+        _print_error '%s is a binary file\n\n' "$file"
         return 1
       else
         less -RS $file
@@ -125,6 +126,7 @@ if [ $# -ne 0 ]; then
   _invalid_arguments "$@"
 fi
 
+clear
 _main_menu
 
 exit 0
