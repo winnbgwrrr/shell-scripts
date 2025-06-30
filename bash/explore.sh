@@ -37,20 +37,18 @@ _main_menu() {
   _display_menu "${optslist[@]}"
   lastopt=$((${#optslist[@]}-1))
   read -p "Enter Choice [1-$lastopt] " usrin
+  clear
   case "$usrin" in
     $lastopt|[Qq]*)
       return 0
       ;;
     $(($lastopt-1)))
-      clear
       _finder
       ;;
     *)
       if ! _int_test "$usrin" || [ -z "${optslist[$usrin]}" ]; then
-        clear
         _print_error '%s\n\n' "$usrin $NOT_RECOGNIZED_OPTION"
       else
-        clear
         ( cd "${locations[${optslist[$usrin]}]}";  _finder; )
       fi
       ;;
