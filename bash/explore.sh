@@ -13,7 +13,7 @@
 USAGE_STR='[-h]'
 
 _main_menu() {
-  local usrin lastopt error
+  local usrin lastopt
   declare -A locations
   declare -a optslist
   optslist=('Select one of the following categories:')
@@ -57,40 +57,38 @@ _main_menu() {
 }
 
 _finder() {
-  local path
-  path=$(find * -maxdepth 3 -not -path '*.git/*' 2>/dev/null | fzf) || return 0
-  if [ -d "$path" ]; then
-    pushd "$path" >/dev/null
+  local file regex
+  if [ "$PWD" = '/' ]; then
+    regex='\(tmp\|dev\|proc\|home\)\|'
+  fi
+  file=$(find * -maxdepth 3 -regex "$regex.*.git" -prune \
+    -o -not -readable -prune -o \( -type d -not -executable \) -prune \
+    -o -exec file -00 --mime-encoding {} + | _file_filter | fzf \
+    --bind "enter:transform:[ -d "{}" ] && echo 'accept' ||
+      echo 'execute($open_file)'") || return 0
+  if [ -d "$file" ]; then
+    pushd "$file" >/dev/null
     _finder
     popd >/dev/null
-  else
-    _open_file "$path" || return 1
-    _finder
   fi
 }
 
-_open_file() {
-  local file
-  file="${1:?}"
-  case "$file" in
-    *.md|*.config|*.conf|*.sh)
-      vim -b $file
-      ;;
-    *.json)
-      jq "." $file | less -S
-      ;;
-    *.log|*.zip|*.gz)
-      less $file
-      ;;
-    *)
-      if [ "$(file "$file" --mime-encoding | cut -d ' ' -f 2)" = 'binary' ]; then
-        _print_error '%s is a binary file\n\n' "$file"
-        return 1
-      else
-        less -RS $file
-      fi
-      ;;
-  esac
+_file_filter() {
+  while read -r -d $'\0' file;
+    do read -r -d $'\0' type;
+    if [ -d "$file" ]; then
+      echo "$file"
+      continue
+    elif [ "$type" != 'binary' ]; then
+      echo "$file"
+      continue
+    fi
+    case "$file" in
+      *.gz|*.zip)
+        echo "$file"
+        ;;
+    esac
+  done;
 }
 
 ####################
@@ -123,6 +121,24 @@ shift $((OPTIND-1))
 if [ $# -ne 0 ]; then
   _invalid_arguments "$@"
 fi
+
+open_file='
+  file={}
+  case "$file" in
+    *.md|*.sh)
+      vim -b "$file"
+      ;;
+    *.json)
+      jq "." "$file" | less -S
+      ;;
+    *.log|*.config|*.conf|*.zip|*.gz)
+      less -S "$file"
+      ;;
+    *)
+      less -RS "$file"
+      ;;
+  esac
+'
 
 clear
 _main_menu
