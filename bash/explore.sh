@@ -25,14 +25,7 @@ _main_menu() {
   locations[usr-bin]='/usr/bin'
   locations[usr-share]='/usr/share'
   locations[etc]='/etc'
-  for k in "${!locations[@]}"; do
-    if [ -d "${locations[$k]}" ]; then
-      optslist+=("$k")
-    else
-      unset locations["$k"]
-    fi
-  done
-  optslist+=('Working Directory')
+  optslist+=("${!locations[@]}")
   optslist+=('Quit')
   _display_menu "${optslist[@]}"
   lastopt=$((${#optslist[@]}-1))
@@ -63,7 +56,7 @@ _finder() {
   fi
   file=$(find * -maxdepth 3 -regex "$regex.*.git" -prune \
     -o -not -readable -prune -o \( -type d -not -executable \) -prune \
-    -o -exec file -00 --mime-encoding {} + | _file_filter | fzf \
+    -o -exec file -00 --mime-encoding {} + 2>/dev/null | _file_filter | fzf \
     --bind "enter:transform:[ -d "{}" ] && echo 'accept' ||
       echo 'execute($open_file)'") || return 0
   if [ -d "$file" ]; then
@@ -104,10 +97,15 @@ Usage: $(basename $0) $USAGE_STR
 END
 )
 
-while getopts 'h' OPT; do
+while getopts 'hm' OPT; do
   case "$OPT" in
     h)
       printf '%s\n' "$help"
+      exit 0
+      ;;
+    m)
+      clear
+      _main_menu
       exit 0
       ;;
     *)
@@ -118,7 +116,7 @@ done
 
 shift $((OPTIND-1))
 
-if [ $# -ne 0 ]; then
+if [ $# -gt 1 ]; then
   _invalid_arguments "$@"
 fi
 
@@ -140,7 +138,15 @@ open_file='
   esac
 '
 
-clear
-_main_menu
+if [ $# -eq 0 ]; then
+  _finder
+elif [ "$1" = '--main-menu' ]; then
+  clear
+  _main_menu
+elif [ -d "$1" ]; then
+  ( cd "$1"; _finder )
+else
+  _invalid_arguments "$@"
+fi
 
 exit 0
