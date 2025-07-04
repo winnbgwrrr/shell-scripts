@@ -42,6 +42,7 @@ shift $((OPTIND-1))
 [ -z "$TMUX" ] && exit 0
 [ $(($(tput cols)*10/$(tput lines))) -gt 36 ] &&
   tmux split-window -h || tmux split-window -v
-[ $# -gt 0 ] && tmux send-keys "$@" C-m
+tmux set-hook -p pane-focus-out "kill-pane"
+[ $# -gt 0 ] && tmux send-keys "$*" C-m
 
 exit 0
