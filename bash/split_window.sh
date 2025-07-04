@@ -43,6 +43,6 @@ shift $((OPTIND-1))
 [ $(($(tput cols)*10/$(tput lines))) -gt 36 ] &&
   tmux split-window -h || tmux split-window -v
 tmux set-hook -p pane-focus-out "kill-pane"
-[ $# -gt 0 ] && tmux send-keys "$*" C-m
+[ $# -gt 0 ] && tmux send-keys "nocorrect $*" C-m
 
 exit 0
