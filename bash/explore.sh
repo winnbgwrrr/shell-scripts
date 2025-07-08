@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 ################################################################################
 # Script:   explore.sh                                                         #
-# Function:                                                                    #
-# Usage:    explore.sh [-h]                                                    #
+# Function: Explore a directory using a fuzzy file finder.                     #
+# Usage:    explore.sh [-h] [directory]                                        #
 #                                                                              #
 # Author: Robert Winslow                                                       #
 # Date written: 05-11-2025                                                     #
@@ -10,23 +10,22 @@
 ################################################################################
 . $(dirname $0)/common.functions
 
-USAGE_STR='[-h]'
+USAGE_STR='[-h] [directory]'
 
+########################################
+# Display a menu of options for where to start fzf from if any of the specified
+# locations exist in the current direcotry.
+# Arguments:
+#   None
+# Outputs:
+#   The menu
+#   A message to stderr if the user does not provide a recognized option at
+#   the menu prompt
+# Returns:
+#   0 if the user selects the 'Quit' option
+########################################
 _main_menu() {
-  local usrin lastopt
-  declare -A locations
-  declare -a optslist
-  optslist=('Select one of the following categories:')
-  locations[config]="$HOME/.config"
-  locations[bash_scripts]="$HOME/git/shell_scripts/bash"
-  locations[config_files]="$HOME/git/dotfiles"
-  locations[home]="$HOME"
-  locations[root]='/'
-  locations[usr-bin]='/usr/bin'
-  locations[usr-share]='/usr/share'
-  locations[etc]='/etc'
-  optslist+=("${!locations[@]}")
-  optslist+=('Quit')
+  local lastopt usrin
   _display_menu "${optslist[@]}"
   lastopt=$((${#optslist[@]}-1))
   read -p "Enter Choice [1-$lastopt] " usrin
@@ -35,20 +34,25 @@ _main_menu() {
     $lastopt|[Qq]*)
       return 0
       ;;
-    $(($lastopt-1)))
-      _finder
-      ;;
-    *)
-      if ! _int_test "$usrin" || [ -z "${optslist[$usrin]}" ]; then
-        _print_error '%s\n\n' "$usrin $NOT_RECOGNIZED_OPTION"
-      else
-        ( cd "${locations[${optslist[$usrin]}]}";  _finder; )
-      fi
-      ;;
   esac
+  if ! _int_test "$usrin" || [ -z "${optslist[$usrin]}" ]; then
+    _print_error '%s\n\n' "$usrin $NOT_RECOGNIZED_OPTION"
+  else
+    ( cd "${locations[${optslist[$usrin]}]}";  _finder; )
+  fi
   _main_menu
 }
 
+########################################
+# Fuzzy find a file or directory. Selected files will open using an appropriate
+# program, and selected directories will be navigated to.
+# Arguments:
+#   None
+# Outputs:
+#   The fzf user interface
+# Returns:
+#   0 if the user quits fzf without making a selection
+########################################
 _finder() {
   local file regex
   if [ "$PWD" = '/' ]; then
@@ -58,7 +62,7 @@ _finder() {
     -o -not -readable -prune -o \( -type d -not -executable \) -prune \
     -o -exec file -00 --mime-encoding {} + 2>/dev/null | _file_filter | fzf \
     --bind "enter:transform:[ -d "{}" ] && echo 'accept' ||
-      echo 'execute($open_file)'") || return 0
+      echo 'execute($open_file)+end-of-line+unix-line-discard'") || return 0
   if [ -d "$file" ]; then
     pushd "$file" >/dev/null
     _finder
@@ -66,6 +70,13 @@ _finder() {
   fi
 }
 
+########################################
+# Filter a list of files to remove files that are not human readable.
+# Arguments:
+#   A null delimited list of files and file metadata
+# Outputs:
+#   A newline delimited list of files
+########################################
 _file_filter() {
   while read -r -d $'\0' file;
     do read -r -d $'\0' type;
@@ -88,11 +99,12 @@ _file_filter() {
 # explore.sh START
 ####################
 help=$(cat <<END
-Program description goes here.
+Explore a directory using a fuzzy file finder.
 
 Usage: $(basename $0) $USAGE_STR
 
-  -h            Print this help message
+  -h               Print this help message
+  -m, --main-menu  Run in menu mode
 
 END
 )
@@ -104,9 +116,7 @@ while getopts 'hm' OPT; do
       exit 0
       ;;
     m)
-      clear
-      _main_menu
-      exit 0
+      mode='menu'
       ;;
     *)
       _usage
@@ -115,10 +125,6 @@ while getopts 'hm' OPT; do
 done
 
 shift $((OPTIND-1))
-
-if [ $# -gt 1 ]; then
-  _invalid_arguments "$@"
-fi
 
 open_file='
   file={}
@@ -138,15 +144,33 @@ open_file='
   esac
 '
 
-if [ $# -eq 0 ]; then
-  _finder
-elif [ "$1" = '--main-menu' ]; then
-  clear
-  _main_menu
+if [ "$1" = '--main-menu' ]; then
+  mode='menu'
 elif [ -d "$1" ]; then
-  ( cd "$1"; _finder )
-else
+  cd "$1" || exit 99
+elif [ $# -gt 1 ]; then
   _invalid_arguments "$@"
+fi
+
+unset PS1
+clear
+if [ "$mode" = 'menu' ]; then
+  declare -A locations
+  declare -a optslist
+  optslist=('Select one of the following categories:')
+  locations[config]="$HOME/.config"
+  locations[bash_scripts]="$HOME/git/shell_scripts/bash"
+  locations[config_files]="$HOME/git/dotfiles"
+  locations[home]="$HOME"
+  locations[root]='/'
+  locations[usr-bin]='/usr/bin'
+  locations[usr-share]='/usr/share'
+  locations[etc]='/etc'
+  optslist+=("${!locations[@]}")
+  optslist+=('Quit')
+  _main_menu
+else
+  _finder
 fi
 
 exit 0
