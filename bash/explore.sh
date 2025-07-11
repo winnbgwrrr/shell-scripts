@@ -158,8 +158,6 @@ elif [ $# -gt 1 ]; then
   _invalid_arguments "$@"
 fi
 
-eval "$(fzf --bash)"
-
 unset PS1
 clear
 if [ "$mode" = 'menu' ]; then
