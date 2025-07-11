@@ -52,6 +52,8 @@ _main_menu() {
 #   None
 # Outputs:
 #   The fzf user interface
+#   If the user presses ctrl-o when in fzf the real path of the selected file
+#   will be output to stdout
 # Returns:
 #   0 if the user quits fzf without making a selection
 ########################################
@@ -65,14 +67,18 @@ _finder() {
     -o -exec file -00 --mime-encoding {} + 2>/dev/null | _file_filter | fzf \
     --bind "enter:transform:[ -d "{}" ] && echo 'accept' ||
       echo 'execute($open_file)+end-of-line+unix-line-discard'" \
-    --bind 'alt-enter:become(echo alt:{})') || return 0
-  if [ "${file:0:4}" = 'alt:' ]; then
-    realpath "${file:4}"
-    exit 0
-  elif [ -d "$file" ]; then
+    --bind 'ctrl-v:become(echo \<vim\>)' \
+    --bind 'ctrl-o:become(echo \<alt\>{})') || return 0
+  if [ -d "$file" ]; then
     pushd "$file" >/dev/null
     _finder
     popd >/dev/null
+  elif [ "${file:0:5}" = '<alt>' ]; then
+    realpath "${file:5}"
+    exit 0
+  elif [ "$file" = '<vim>' ]; then
+    vim
+    _finder
   fi
 }
 
