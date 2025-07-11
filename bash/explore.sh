@@ -38,7 +38,9 @@ _main_menu() {
   if ! _int_test "$usrin" || [ -z "${optslist[$usrin]}" ]; then
     _print_error '%s\n\n' "$usrin $NOT_RECOGNIZED_OPTION"
   else
-    ( cd "${locations[${optslist[$usrin]}]}";  _finder; )
+    pushd  "${locations[${optslist[$usrin]}]}" >/dev/null
+    _finder
+    popd >/dev/null
   fi
   _main_menu
 }
@@ -62,8 +64,12 @@ _finder() {
     -o -not -readable -prune -o \( -type d -not -executable \) -prune \
     -o -exec file -00 --mime-encoding {} + 2>/dev/null | _file_filter | fzf \
     --bind "enter:transform:[ -d "{}" ] && echo 'accept' ||
-      echo 'execute($open_file)+end-of-line+unix-line-discard'") || return 0
-  if [ -d "$file" ]; then
+      echo 'execute($open_file)+end-of-line+unix-line-discard'" \
+    --bind 'alt-enter:become(echo alt:{})') || return 0
+  if [ "${file:0:4}" = 'alt:' ]; then
+    realpath "${file:4}"
+    exit 0
+  elif [ -d "$file" ]; then
     pushd "$file" >/dev/null
     _finder
     popd >/dev/null
@@ -151,6 +157,8 @@ elif [ -d "$1" ]; then
 elif [ $# -gt 1 ]; then
   _invalid_arguments "$@"
 fi
+
+eval "$(fzf --bash)"
 
 unset PS1
 clear
