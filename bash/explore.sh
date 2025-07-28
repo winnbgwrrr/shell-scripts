@@ -64,7 +64,7 @@ _finder() {
   fi
   file=$(find * -maxdepth 3 -regex "$regex.*.git" -prune \
     -o -not -readable -prune -o \( -type d -not -executable \) -prune \
-    -o -exec file -00 --mime-encoding {} + 2>/dev/null | _file_filter | fzf \
+    -o -print 2>/dev/null | fzf \
     --bind "enter:transform:[ -d "{}" ] && echo 'accept' ||
       echo 'execute($open_file)+end-of-line+unix-line-discard'" \
     --bind 'ctrl-v:become(echo \<vim\>)' \
@@ -80,31 +80,6 @@ _finder() {
     vim
     _finder
   fi
-}
-
-########################################
-# Filter a list of files to remove files that are not human readable.
-# Arguments:
-#   A null delimited list of files and file metadata
-# Outputs:
-#   A newline delimited list of files
-########################################
-_file_filter() {
-  while read -r -d $'\0' file;
-    do read -r -d $'\0' type;
-    if [ -d "$file" ]; then
-      echo "$file"
-      continue
-    elif [ "$type" != 'binary' ]; then
-      echo "$file"
-      continue
-    fi
-    case "$file" in
-      *.gz|*.zip)
-        echo "$file"
-        ;;
-    esac
-  done;
 }
 
 ####################
