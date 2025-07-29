@@ -114,7 +114,7 @@ done
 shift $((OPTIND-1))
 
 open_file='
-  file={}
+  file="{}"
   case "$file" in
     *.md|*.sh)
       vim -b "$file"
