@@ -59,9 +59,12 @@ pattern="$1"
 shift
 path="$@"
 
-if [ $(tput cols) -gt 175 ]; then
+if [ $(tput cols) -gt 187 ]; then
   layout='right'
   sep_width=$(($(tput cols)/2-7))
+elif [ $(tput cols) -gt 156 ]; then
+  layout='right,60%'
+  sep_width=$(($(tput cols)*3/5-7))
 else
   layout='up'
   sep_width=$(($(tput cols)-7))
