@@ -63,12 +63,13 @@ common.functions
 passwordmanager.sh
 printrandom.sh
 secure.sh
-search.sh
+explore.sh
 visual_grep.sh
 grep_preview.sh
 new_script.sh
 fix_history.sh
 setup_workspace.sh
+split_window.sh
 EOF
 
 for sh in "${scripts[@]}"; do
