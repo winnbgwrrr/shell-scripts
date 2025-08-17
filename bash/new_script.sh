@@ -43,10 +43,12 @@ if [ $# -ne 1 ]; then
   _invalid_arguments "$@"
 fi
 
-snm=${1:?}
-if [ -f "$snm" ]; then
-  _print_error '%s\n' "$snm already exists"
+fnm="${1:?}"
+if [ -f "$fnm" ]; then
+  _print_error '%s\n' "$fnm already exists"
   exit 99
+else
+  snm="${fnm##*/}"
 fi
 
 template=$(cat <<'EOF'
@@ -56,7 +58,7 @@ template=$(cat <<'EOF'
 # Function:                                                                    #
 # Usage:                                                                  #
 #                                                                              #
-# Author: Robert Winslow                                                       #
+# Author:                                                                      #
 # Date written:                                                      #
 #                                                                              #
 ################################################################################
@@ -99,11 +101,13 @@ exit 0
 EOF
 )
 
-printf '%s\n' "$template" >"$snm"
-sed -i "s/\(^# Script:   \) \{${#snm}\}/\1$snm/" "$snm"
-sed -i "s/\(^# Usage:    \) \{${#snm}\}/\1$snm [-h]/" "$snm"
-sed -i "s/\(^# Date written: \)/\1$(date '+%m-%d-%Y')/" "$snm"
-sed -i "s/^# START/# $snm START/" "$snm"
-chmod 750 "$snm"
+author="$(_get_full_name)"
+printf '%s\n' "$template" >"$fnm"
+sed -i "s/\(^# Script:   \) \{${#snm}\}/\1$snm/" "$fnm"
+sed -i "s/\(^# Usage:    \) \{${#snm}\}/\1$snm [-h]/" "$fnm"
+sed -i "s/\(^# Author: \) \{${#author}\}/\1$author/" "$fnm"
+sed -i "s/\(^# Date written: \)/\1$(date '+%m-%d-%Y')/" "$fnm"
+sed -i "s/^# START/# $snm START/" "$fnm"
+chmod 750 "$fnm"
 
 exit 0
