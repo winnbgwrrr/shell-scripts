@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
+################################################################################
+# Script:   common.functions                                                   #
+# Function: Library of bash functions.                                         #
+#                                                                              #
+# Author: Robert Winslow                                                       #
+# Date written: 05-05-2022                                                     #
+#                                                                              #
+################################################################################
 
 declare -r NO_FILE_NO_DIRECTORY='No such file or directory'
 declare -r MISSING_ARGUMENT='missing argument'
@@ -24,7 +32,7 @@ _print_error() {
   local fmt
   fmt='ERROR: %s\n'
   if [ $# -eq 0 ]; then
-    _print_error '%s: %s\n' ${FUNCNAME[0]} "$MISSING_ARGUMENT"
+    _print_error '%s: %s\n' "${FUNCNAME[0]}" "$MISSING_ARGUMENT"
     return 1
   elif [ $# -gt 1 ]; then
     fmt="$1"
@@ -46,6 +54,7 @@ _print_error() {
 #   An optional documentation page message is output to stderr
 ########################################
 _usage() {
+  local script_name
   script_name=$(basename $0)
   _print_error 'Usage: %s\n' "$script_name $USAGE_STR"
   _print_error '%s\n' "Try '$script_name -h' for more information."
@@ -60,7 +69,7 @@ _usage() {
 #   The invalid arguments message is output to stderr
 ########################################
 _invalid_arguments() {
-  _print_error '%s\n' "$0: $INVALID_ARGUMENTS -- $*"
+  _print_error '%s: %s\n' "$0" "$INVALID_ARGUMENTS -- $*"
   _usage
 }
 
@@ -84,7 +93,7 @@ _clear() {
     return 0
   fi
 
-  _print_error '%s\n' "${FUNCNAME[0]}: $INVALID_ARGUMENTS -- $*"
+  _print_error '%s: %s\n' "${FUNCNAME[0]}" "$INVALID_ARGUMENTS -- $*"
   return 1
 }
 
@@ -104,7 +113,7 @@ _truncate() {
   shift
   _int_test $length ||
     {
-      _print_error '%s\n' "$length $NOT_INTEGER"
+      _print_error '%s: %s\n' "${FUNCNAME[0]}" "$length $NOT_INTEGER"
       return 1
     }
   string="${@:?}"
@@ -118,27 +127,14 @@ _truncate() {
 ########################################
 # Tests a value to determine if it is a valid integer.
 # Arguments:
-#   The value
+#   A string
 # Returns:
 #   1 if the value is not a valid integer
-########################################
+#########################################
 _int_test() {
   if [ -z "${1##*[!0-9]*}" ]; then
     return 1
   fi
-}
-
-########################################
-# Tests the argument passed to make sure that it is an integer value, and then
-# prints that number of spaces.
-# Arguments:
-#   The number of spaces
-# Outputs:
-#   Zero or more spaces
-########################################
-_print_spaces() {
-  _int_test "$1"
-  printf '%*s' "$1" ''
 }
 
 ########################################
@@ -160,9 +156,22 @@ _get_random_string() {
   if _int_test $length; then
     echo $(cat /dev/urandom | tr -dc "$include" | fold -w $length | head -n 1)
   else
-    _print_error '%s\n' "${FUNCNAME[0]}: $length $NOT_INTEGER"
+    _print_error '%s: %s\n' "${FUNCNAME[0]}" "$length $NOT_INTEGER"
     return 1
   fi
+}
+
+########################################
+# Tests whether a SSH connection can be made in batch mode.
+# Arguments:
+#   The destination argument for ssh
+# Returns:
+#   1 if the connection could not be made
+########################################
+_test_ssh() {
+  local destination
+  destination="${1:?}"
+  ssh -o BatchMode=yes "$destination" "exit" >/dev/null 2>&1 || return 1
 }
 
 ########################################
@@ -219,12 +228,12 @@ _display_menu() {
     if _int_test $length; then
       shift
     else
-      _print_error '%s\n' "$length $NOT_INTEGER"
+      _print_error '%s: %s\n' "${FUNCNAME[0]}" "$length $NOT_INTEGER"
       return 1
     fi
   fi
   if [ -z "$1" ]; then
-    _print_error '%s\n' 'No menu options found'
+    _print_error '%s: %s\n' "${FUNCNAME[0]}" 'No menu options found'
     return 2
   fi
   menuopts=("$@")
@@ -299,7 +308,7 @@ _git_push() {
   esac
   push_out=$(git push 2>&1 >/dev/null) && echo "$push_out" ||
     {
-      push_cmd=$(awk '/git push/ && !/HEAD:/' <<< "$push_out")
+      push_cmd=$(awk '/git push/ && !/push --help/ && !/HEAD:/' <<< "$push_out")
       [ -z "$push_cmd" ] && echo "$push_out" || bash -c "$push_cmd"
     }
 }
@@ -408,6 +417,8 @@ _gen_dev_note() {
 #   A message to stderr if the user intputs a selection that does not correspond
 #   to the menu being display
 #   The menu listing branches to select from to stdout
+#   A message to stderr if the user does not provide a recognized option at
+#   the menu prompt
 # Returns:
 #   0 if the user selects to quit at the menu
 #   1 if the current directory is not a part of a Git repository
