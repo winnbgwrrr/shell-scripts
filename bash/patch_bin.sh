@@ -72,6 +72,8 @@ setup_workspace.sh
 split_window.sh
 EOF
 
+cd "$bin_dir"
+
 for sh in "${scripts[@]}"; do
   if echo "$exclude_list" | grep -q "$sh"; then
     continue
