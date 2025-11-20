@@ -251,66 +251,26 @@ _display_menu() {
 }
 
 ########################################
-# Performs a git checkout of the dvlp branch (or the main branch if there is no
-# dvlp branch) and then does a git pull.
+# Checkout the dvlp branch or the default branch if dvlp does not exist, and
+# git pull.
 # Arguments:
 #   none
 # Outputs:
 #   A message to stderr if the current directory is not a part of a Git
 #   repository
-#   A message to stderr if the neither a dvlp or main branch is found for the
-#   repository
 # Returns:
 #   1 if the current directory is not a part of a Git repository
-#   2 is there it not possible to checkout a dvlp or a main branch
 ########################################
 _git_pull() {
-  branch=$(git rev-parse --symbolic --verify dvlp 2>/dev/null) ||
-  branch=$(git rev-parse --symbolic --verify main 2>/dev/null) ||
   git rev-parse >/dev/null 2>&1 ||
     {
       _print_error '%s\n' "$PWD $NOT_GIT_REPO"
       return 1
     }
-  if [ -z "$branch" ]; then
-    _print_error '%s\n' 'No dvlp or main branch found for this repository'
-    return 2
-  fi
-  git checkout $branch && git pull
-}
-
-########################################
-# Attempts a git push, if the push is not successful because the current branch
-# has no upstream branch then a second git push is attempted using the command
-# provided by git.
-# Arguments:
-#   none
-# Outputs:
-#   A message to stderr if the current directory is not a part of a Git
-#   repository
-#   A message to stderr if the current branch is a static branch
-# Returns:
-#   1 if the current directory is not a part of a Git repositor
-#   2 if the current branch is a static branch
-########################################
-_git_push() {
-  git rev-parse 2>/dev/null ||
-    {
-      _print_error '%s\n' "$PWD $NOT_GIT_REPO"
-      return 1
-    }
-  branch=$(_git_branch)
-  case "$branch" in
-    dvlp|acct|sit|main)
-      _print_error '%s\n' "Pushing to $branch is forbidden"
-      return 2
-      ;;
-  esac
-  push_out=$(git push 2>&1 >/dev/null) && echo "$push_out" ||
-    {
-      push_cmd=$(awk '/git push/ && !/push --help/ && !/HEAD:/' <<< "$push_out")
-      [ -z "$push_cmd" ] && echo "$push_out" || bash -c "$push_cmd"
-    }
+  ( git rev-parse --symbolic --verify dvlp ||
+    git rev-parse --symbolic --verify $(git var GIT_DEFAULT_BRANCH)
+  ) 2>/dev/null | xargs -r git checkout
+  git pull
 }
 
 ########################################
@@ -407,62 +367,32 @@ _gen_dev_note() {
 }
 
 ########################################
-# Provides a menu to select a remote or local branch for the current Git
+# Provides an interface to select a remote or local branch for the current Git
 # repository, and then does a git checkout of that branch.
 # Arguments:
 #   none
 # Outputs:
-#   A message to stderr if the current directory is not a part of a Git
-#   repository
-#   A message to stderr if the user intputs a selection that does not correspond
-#   to the menu being display
-#   The menu listing branches to select from to stdout
-#   A message to stderr if the user does not provide a recognized option at
-#   the menu prompt
+#   An fzf interface to select a branch
 # Returns:
-#   0 if the user selects to quit at the menu
-#   1 if the current directory is not a part of a Git repository
+#   1 if _git_clean was not successful
 ########################################
 _git_branch_selector() {
-  if [ "$1" != '--no-pull' ] && ! _git_pull; then
-    _print_error '%s\n' "$PWD $NOT_GIT_REPO"
-    return 1
-  fi
+  _git_clean || return 1
+  git branch -a | grep -wv '\(dvlp\|acct\|main\|HEAD\)' |
+    fzf --layout=reverse --height 40% --exit-0 | xargs git checkout
+}
 
-  if [ "$1" != '--no-pull' ]; then
-    git remote prune origin
-    git for-each-ref --format '%(refname:short)' refs/heads | \
-      grep -v 'main' | xargs git branch -d 2>/dev/null
-  fi
-
-  declare -a optslist=('Please select a branch to checkout.')
-  while read line; do
-    if [ -z "${line##*\**}" ] || [ -z "${line##*->*}" ]; then
-      continue
-    fi
-    optslist+=("$line")
-  done< <(git branch -a)
-  optslist+=('Quit')
-  _display_menu "${optslist[@]}"
-  local usrin lastopt
-  lastopt=$((${#optslist[@]}-1))
-  read -p "Enter Choice [1-$lastopt] " usrin
-  echo
-  case "$usrin" in
-    $lastopt|[Qq]*)
-      return 0
-      ;;
-    [0-9]*)
-      if [ -z "${optslist[$usrin]}" ]; then
-        _print_error '\n%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
-        _git_branch_selector '--no-pull'
-      else
-        git checkout "${optslist[$usrin]}"
-      fi
-      ;;
-    *)
-      _print_error '\n%s\n' "$usrin $NOT_RECOGNIZED_OPTION"
-      _git_branch_selector '--no-pull'
-      ;;
-  esac
+########################################
+# Deletes all local branches that have been merged into the default branch and
+# removes any remote-tracking references that no longer exist on the remote.
+# Arguments:
+#   none
+# Returns:
+#   1 if _git_pull was not successful
+########################################
+_git_clean() {
+  _git_pull || return 1
+  default=$(git var GIT_DEFAULT_BRANCH) &&
+  git branch --merged=$default | grep -v "$default" | xargs -r git branch -d
+  git remote prune origin
 }
