@@ -250,6 +250,11 @@ _display_menu() {
   done
 }
 
+_get_full_name() {
+  gpg --list-keys --with-colons | awk -F ':' '/^uid:u/ {print $10}' |
+    sed 's/^\(.*\) <.*/\1/'
+}
+
 ########################################
 # Checkout the dvlp branch or the default branch if dvlp does not exist, and
 # git pull.
