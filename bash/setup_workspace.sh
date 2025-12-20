@@ -2,7 +2,7 @@
 ################################################################################
 # Script:   setup_workspace.sh                                                 #
 # Function:                                                                    #
-# Usage:    setup_workspace.sh [-h] [--TYPE]                                   #
+# Usage:    setup_workspace.sh [-h] [-t type]                                  #
 #                                                                              #
 # Author: Robert Winslow                                                       #
 # Date written: 06-29-2025                                                     #
@@ -10,7 +10,7 @@
 ################################################################################
 . $(dirname $0)/common.functions
 
-USAGE_STR='[-h] [--TYPE]'
+USAGE_STR='[-h] [-t type]'
 
 ####################
 # setup_workspace.sh START
@@ -21,7 +21,7 @@ Program description goes here.
 Usage: $(basename $0) $USAGE_STR
 
   -h            Print this help message
-  --TYPE        The type of workspace; the name of a subdirectory in ~/work
+  -t TYPE       The type of workspace; the name of a subdirectory in ~/work
 
 END
 )
