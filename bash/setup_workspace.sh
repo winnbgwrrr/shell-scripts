@@ -12,15 +12,6 @@
 
 USAGE_STR='[-h] [--TYPE]'
 
-_get_long_opts() {
-  type="${1%%/*}"
-  ws_dir="$HOME/work/${1}"
-  if [ ! -d "$ws_dir" ]; then
-    _yes_no_prompt "$ws_dir does not exist, would you like to create it?" &&
-      mkdir "$ws_dir" || exit 99
-  fi
-}
-
 ####################
 # setup_workspace.sh START
 ####################
@@ -35,14 +26,14 @@ Usage: $(basename $0) $USAGE_STR
 END
 )
 
-while getopts '-:h' OPT; do
+while getopts 'ht:' OPT; do
   case "$OPT" in
-    -)
-      _get_long_opts "$OPTARG"
-      ;;
     h)
       printf '%s\n' "$help"
       exit 0
+      ;;
+    t)
+      type="$OPTARG"
       ;;
     *)
       _usage
@@ -52,21 +43,29 @@ done
 
 shift $((OPTIND-1))
 
-ws_dir="${ws_dir:-$HOME/work}"
-
 if [ $# -ne 1 ]; then
   _invalid_arguments "$@"
 fi
 
-workspace="$1"
-mkdir "$ws_dir/$workspace"
+ws_dir="$HOME/work"
+if [ -n "$type" ]; then
+  ws_dir="$ws_dir/$type"
+fi
+
+[ -d "$ws_dir" ] ||
+  if ! _yes_no_prompt "$ws_dir does not exist, do you want to create it?"; then
+    exit 0
+  fi
+
+workspace="$ws_dir/$1"
+mkdir -p "$workspace"
 
 if [ "$type" = 'sh' ]; then
   git_dir="$HOME/git/shell_scripts/bash"
   ( cd "$git_dir" && git checkout dvlp && git pull; )
-  cp "$git_dir/common.functions" "$ws_dir/$workspace"
+  cp "$git_dir/common.functions" "$workspace"
 fi
 
-echo "cd $ws_dir"
+echo "cd $workspace"
 
 exit 0
