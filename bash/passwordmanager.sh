@@ -193,10 +193,10 @@ _show() {
   usrname=$(echo "$creds" | cut -d / -f 1)
   str=$(echo "$creds" | cut -d / -f 2)
   _clear $debug
-  echo "$str" | wl-copy
+  wl-copy "$str"
   printf '%s - %s\n' "${accname^^}" "$usrname"
   read -t $wait_time -n 1 -p "$ANY_KEY_CONTINUE"
-  echo | wl-copy
+  wl-copy -c
 }
 
 ####################
