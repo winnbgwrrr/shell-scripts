@@ -154,7 +154,7 @@ _get_random_string() {
   length=${1:?}
   include=${2:?}
   if _int_test $length; then
-    echo $(cat /dev/urandom | tr -dc "$include" | fold -w $length | head -n 1)
+    tr -dc "$include" </dev/urandom | fold -w $length | head -n 1
   else
     _print_error '%s: %s\n' "${FUNCNAME[0]}" "$length $NOT_INTEGER"
     return 1
